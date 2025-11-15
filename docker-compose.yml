@@ -2,6 +2,27 @@ version: "3.8"
 
 services:
   # -------------------------
+  # MySQL Database
+  # -------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: MuTraProDB
+      MYSQL_USER: user
+      MYSQL_PASSWORD: user123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # -------------------------
   # Kong API Gateway
   # -------------------------
   kong:
@@ -30,6 +51,16 @@ services:
       - "8081:8081"
     environment:
       ASPNETCORE_URLS: http://+:8081
+      # CHUỖI KẾT NỐI ĐÚNG TRONG DOCKER
+      ConnectionStrings__DefaultConnection: Server=mysql;Port=3306;Database=MuTraProDB;User=root;Password=root123;
+    depends_on:
+      mysql:
+        condition: service_healthy  # ĐỢI MySQL SẴN SÀNG
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # -------------------------
   # Customer Service (FastAPI)
@@ -43,3 +74,9 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 8001
+
+# -------------------------
+# Volume cho MySQL
+# -------------------------
+volumes:
+  mysql-data:
