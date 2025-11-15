@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "B7ugDz1pjHU=",
+  "dgSpecHash": "69Eup8SBHnA=",
   "success": true,
-  "projectFilePath": "D:\\Do_an_gap\\https---github.com-lznguyn-Service\\MuTraProAPI.csproj",
+  "projectFilePath": "D:\\Do_an_gap\\XDPM\\service-1\\MuTraProAPI.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Acer\\.nuget\\packages\\bcrypt.net-next\\4.0.3\\bcrypt.net-next.4.0.3.nupkg.sha512",
     "C:\\Users\\Acer\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",

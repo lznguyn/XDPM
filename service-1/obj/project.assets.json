@@ -3652,11 +3652,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Do_an_gap\\https---github.com-lznguyn-Service\\MuTraProAPI.csproj",
+      "projectUniqueName": "D:\\Do_an_gap\\XDPM\\service-1\\MuTraProAPI.csproj",
       "projectName": "MuTraProAPI",
-      "projectPath": "D:\\Do_an_gap\\https---github.com-lznguyn-Service\\MuTraProAPI.csproj",
+      "projectPath": "D:\\Do_an_gap\\XDPM\\service-1\\MuTraProAPI.csproj",
       "packagesPath": "C:\\Users\\Acer\\.nuget\\packages\\",
-      "outputPath": "D:\\Do_an_gap\\https---github.com-lznguyn-Service\\obj\\",
+      "outputPath": "D:\\Do_an_gap\\XDPM\\service-1\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
