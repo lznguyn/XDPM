@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  # -------------------------
+  # Kong API Gateway
+  # -------------------------
+  kong:
+    image: kong:3.7
+    container_name: kong
+    ports:
+      - "8000:8000" # public API
+      - "8001:8001" # admin API
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+    volumes:
+      - ./kong.yml:/etc/kong/kong.yml:ro
+    depends_on:
+      - auth-service
+      - customer-service
+
+  # -------------------------
+  # Auth Service (.NET)
+  # -------------------------
+  auth-service:
+    build:
+      context: ./https---github.com-lznguyn-Service
+    container_name: auth-service
+    ports:
+      - "8081:8081"
+    environment:
+      ASPNETCORE_URLS: http://+:8081
+
+  # -------------------------
+  # Customer Service (FastAPI)
+  # -------------------------
+  customer-service:
+    build:
+      context: ./XDOOP
+    container_name: customer-service
+    ports:
+      - "8082:8082"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8001

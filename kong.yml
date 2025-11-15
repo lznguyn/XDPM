@@ -1,0 +1,25 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  # ==========================
+  # AUTH SERVICE (.NET 8081)
+  # ==========================
+  - name: auth-service
+    url: http://auth-service:8081/api/Auth
+    routes:
+      - name: auth-route
+        paths:
+          - /auth
+        strip_path: true
+
+  # ==========================
+  # CUSTOMER SERVICE (FastAPI 8001)
+  # ==========================
+  - name: customer-service
+    url: http://customer-service:8001
+    routes:
+      - name: customer-route
+        paths:
+          - /customer
+        strip_path: true
