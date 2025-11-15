@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MuTraPro - Bảng Điều Khiển Khách Hàng</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-info {
+            text-align: right;
+        }
+
+        .customer-name {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .logout-btn {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #ff5252;
+        }
+
+        /* Tabs Navigation */
+        .tabs-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            flex-wrap: wrap;
+        }
+
+        .tab-button {
+            padding: 12px 20px;
+            border: none;
+            background: #f0f0f0;
+            color: #666;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .tab-button.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .tab-button:hover {
+            background: #e0e0e0;
+        }
+
+        .tab-button.active:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-danger {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ff5252;
+        }
+
+        .btn-success {
+            background: #51cf66;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #40c057;
+        }
+
+        /* Cards */
+        .card {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .card-meta {
+            display: flex;
+            gap: 15px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #999;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-pending {
+            background: #fff3bf;
+            color: #e67700;
+        }
+
+        .badge-processing {
+            background: #d0ebff;
+            color: #1971c2;
+        }
+
+        .badge-completed {
+            background: #d3f9d8;
+            color: #2f9e44;
+        }
+
+        .badge-paid {
+            background: #d3f9d8;
+            color: #2f9e44;
+        }
+
+        .badge-unpaid {
+            background: #ffe0e6;
+            color: #c92a2a;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* Table */
+        .table-responsive {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: #f5f5f5;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        /* File Upload */
+        .file-upload {
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #f8f9ff;
+        }
+
+        .file-upload:hover {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .file-upload.active {
+            border-color: #764ba2;
+            background: #f0f1ff;
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+
+        .upload-text {
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 12px;
+        }
+
+        /* Messages */
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .message.success {
+            background: #d3f9d8;
+            color: #2f9e44;
+            border-left: 4px solid #2f9e44;
+        }
+
+        .message.error {
+            background: #ffe0e6;
+            color: #c92a2a;
+            border-left: 4px solid #c92a2a;
+        }
+
+        .message.info {
+            background: #d0ebff;
+            color: #1971c2;
+            border-left: 4px solid #1971c2;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            transition: color 0.3s;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+                gap: 15px;
+            }
+
+            .header-info {
+                text-align: center;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs-container {
+                flex-direction: column;
+            }
+
+            .tab-button {
+                width: 100%;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tab-content {
+                padding: 15px;
+            }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 3px solid #f0f0f0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            padding: 20px;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎵 MuTraPro Dashboard</h1>
+            <div class="header-info">
+                <div class="customer-name" id="customerNameDisplay">Khách hàng</div>
+                <button class="logout-btn" onclick="logout()">Đăng Xuất</button>
+            </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="tabs-container">
+            <button class="tab-button active" onclick="switchTab('dashboard')">📊 Bảng Điều Khiển</button>
+            <button class="tab-button" onclick="switchTab('profile')">👤 Hồ Sơ Khách Hàng</button>
+            <button class="tab-button" onclick="switchTab('upload')">📁 Tạo Yêu Cầu</button>
+            <button class="tab-button" onclick="switchTab('tracking')">📋 Theo Dõi Đơn</button>
+            <button class="tab-button" onclick="switchTab('payments')">💰 Thanh Toán</button>
+            <button class="tab-button" onclick="switchTab('feedback')">💬 Yêu Cầu Chỉnh Sửa</button>
+            <button class="tab-button" onclick="window.location.href='index.html'">🏠 Trang Chủ</button>
+
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <h2>📊 Tổng Quan</h2>
+            <div class="stats-grid" id="statsGrid"></div>
+            <h3 style="margin-top: 30px; margin-bottom: 20px;">Đơn Hàng Gần Đây</h3>
+            <div id="recentRequests"></div>
+        </div>
+
+        <!-- Profile Tab -->
+        <div id="profile" class="tab-content">
+            <h2>👤 Quản Lý Hồ Sơ Khách Hàng</h2>
+            <div id="profileMessage"></div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Tên Khách Hàng *</label>
+                    <input type="text" id="profileName" placeholder="Nhập tên của bạn">
+                </div>
+                <div class="form-group">
+                    <label>Email *</label>
+                    <input type="email" id="profileEmail" placeholder="Nhập email">
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Điện Thoại</label>
+                    <input type="tel" id="profilePhone" placeholder="Nhập số điện thoại">
+                </div>
+                <div class="form-group">
+                    <label>Địa Chỉ</label>
+                    <input type="text" id="profileAddress" placeholder="Nhập địa chỉ">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary" onclick="saveProfile()">💾 Lưu Hồ Sơ</button>
+                <button class="btn btn-secondary" onclick="loadProfile()">🔄 Tải Lại</button>
+            </div>
+        </div>
+
+        <!-- Upload Tab -->
+        <div id="upload" class="tab-content">
+            <h2>📁 Tạo Yêu Cầu Dịch Vụ</h2>
+            <div id="uploadMessage"></div>
+
+            <div class="form-group">
+                <label>Loại Dịch Vụ *</label>
+                <select id="serviceType">
+                    <option value="">-- Chọn Loại Dịch Vụ --</option>
+                    <option value="transcription">🎤 Phiên Âm (Transcription)</option>
+                    <option value="arrangement">🎼 Phối khí (Arrangement)</option>
+                    <option value="recording">🎙️ Thu Âm (Recording)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Tệp Âm Thanh / Nhạc *</label>
+                <div class="file-upload" id="fileUpload">
+                    <div class="upload-icon">📤</div>
+                    <div class="upload-text">Kéo thả tệp hoặc nhấp để chọn</div>
+                    <div class="upload-hint">Hỗ trợ MP3, WAV, OGG, FLAC (Tối đa 100MB)</div>
+                    <input type="file" id="audioFile" accept="audio/*">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Mô Tả Yêu Cầu</label>
+                <textarea id="requestDescription" placeholder="Mô tả chi tiết yêu cầu của bạn..."></textarea>
+            </div>
+
+            <button class="btn btn-primary" onclick="submitRequest()" style="width: 100%;">
+                🚀 Gửi Yêu Cầu
+            </button>
+        </div>
+
+        <!-- Tracking Tab -->
+        <div id="tracking" class="tab-content">
+            <h2>📋 Theo Dõi Đơn Hàng</h2>
+            <div id="trackingMessage"></div>
+            <div id="requestsList"></div>
+        </div>
+
+        <!-- Payments Tab -->
+        <div id="payments" class="tab-content">
+            <h2>💰 Quản Lý Thanh Toán</h2>
+            <div id="paymentsMessage"></div>
+            
+            <!-- Payment Stats -->
+            <div class="stats-grid" id="paymentStats"></div>
+
+            <!-- Unpaid Requests -->
+            <h3 style="margin-top: 30px; margin-bottom: 20px;">Các Đơn Chưa Thanh Toán</h3>
+            <div id="unpaidRequests"></div>
+
+            <!-- Transactions -->
+            <h3 style="margin-top: 30px; margin-bottom: 20px;">Lịch Sử Giao Dịch</h3>
+            <div class="table-responsive">
+                <table id="transactionsTable">
+                    <thead>
+                        <tr>
+                            <th>Ngày Giao Dịch</th>
+                            <th>Mã Thanh Toán</th>
+                            <th>Liên Kết Đơn</th>
+                            <th>Số Tiền</th>
+                            <th>Trạng Thái</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Feedback Tab -->
+        <div id="feedback" class="tab-content">
+            <h2>💬 Yêu Cầu Chỉnh Sửa & Phản Hồi</h2>
+            <div id="feedbackMessage"></div>
+
+            <div class="form-group">
+                <label>Chọn Đơn Hàng *</label>
+                <select id="feedbackRequestId">
+                    <option value="">-- Chọn Đơn Hàng --</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Nội Dung Chỉnh Sửa / Phản Hồi *</label>
+                <textarea id="feedbackContent" placeholder="Mô tả chi tiết những chỉnh sửa bạn muốn..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Loại Phản Hồi *</label>
+                <select id="feedbackType">
+                    <option value="">-- Chọn Loại --</option>
+                    <option value="revision">✏️ Yêu Cầu Chỉnh Sửa</option>
+                    <option value="bug">🐛 Báo Lỗi</option>
+                    <option value="suggestion">💡 Đề Xuất</option>
+                </select>
+            </div>
+
+            <button class="btn btn-primary" onclick="submitFeedback()" style="width: 100%;">
+                📤 Gửi Phản Hồi
+            </button>
+
+            <!-- Previous Feedback -->
+            <h3 style="margin-top: 30px; margin-bottom: 20px;">Phản Hồi Trước Đó</h3>
+            <div id="feedbackHistory"></div>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">💳 Thanh Toán</h2>
+                <button class="modal-close" onclick="closePaymentModal()">✕</button>
+            </div>
+            <div id="paymentModalBody"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE = 'http://localhost:8001';
+        let currentCustomerId = localStorage.getItem('customerId');
+        let currentCustomerName = localStorage.getItem('customerName');
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            if (!currentCustomerId) {
+                // Redirect to auth page
+                window.location.href = 'auth.html';
+            } else {
+                updateCustomerDisplay();
+                loadProfile();
+                loadDashboard();
+            }
+        }
+
+        // ==================== LOGIN FLOW ====================
+        function logout() {
+            localStorage.removeItem('customerId');
+            localStorage.removeItem('customerName');
+            window.location.href = 'auth.html';
+        }
+
+        function updateCustomerDisplay() {
+            document.getElementById('customerNameDisplay').textContent = currentCustomerName || 'Khách hàng';
+        }
+
+        // ==================== TAB SWITCHING ====================
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Deactivate all buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+
+            // Activate selected button
+            event.target.classList.add('active');
+
+            // Load data for specific tabs
+            if (tabName === 'dashboard') loadDashboard();
+            if (tabName === 'tracking') loadRequests();
+            if (tabName === 'payments') loadPayments();
+            if (tabName === 'feedback') loadFeedback();
+        }
+
+        // ==================== PROFILE MANAGEMENT ====================
+        async function loadProfile() {
+            try {
+                const response = await fetch(`${API_BASE}/customers/${currentCustomerId}`);
+                if (!response.ok) return;
+
+                const customer = await response.json();
+                document.getElementById('profileName').value = customer.name || '';
+                document.getElementById('profileEmail').value = customer.email || '';
+                document.getElementById('profilePhone').value = customer.phone || '';
+                document.getElementById('profileAddress').value = customer.address || '';
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+
+        async function saveProfile() {
+            const name = document.getElementById('profileName').value.trim();
+            const email = document.getElementById('profileEmail').value.trim();
+            const phone = document.getElementById('profilePhone').value.trim();
+            const address = document.getElementById('profileAddress').value.trim();
+            const messageDiv = document.getElementById('profileMessage');
+
+            if (!name || !email) {
+                showMessage(messageDiv, 'Vui lòng nhập tên và email', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/customers/${currentCustomerId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, phone, address })
+                });
+
+                if (!response.ok) throw new Error('Lỗi cập nhật hồ sơ');
+
+                showMessage(messageDiv, '✓ Hồ sơ đã được lưu thành công', 'success');
+                localStorage.setItem('customerName', name);
+                updateCustomerDisplay();
+            } catch (error) {
+                showMessage(messageDiv, 'Lỗi: ' + error.message, 'error');
+            }
+        }
+
+        // ==================== FILE UPLOAD ====================
+        const fileUpload = document.getElementById('fileUpload');
+        const audioFileInput = document.getElementById('audioFile');
+
+        fileUpload.addEventListener('click', () => audioFileInput.click());
+        
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.classList.add('active');
+        });
+
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.classList.remove('active');
+        });
+
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('active');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                audioFileInput.files = files;
+            }
+        });
+
+        audioFileInput.addEventListener('change', () => {
+            const fileName = audioFileInput.files[0]?.name || 'Chọn tệp';
+            fileUpload.querySelector('.upload-text').textContent = '✓ ' + fileName;
+        });
+
+        async function submitRequest() {
+            const serviceType = document.getElementById('serviceType').value;
+            const description = document.getElementById('requestDescription').value.trim();
+            const file = audioFileInput.files[0];
+            const messageDiv = document.getElementById('uploadMessage');
+
+            if (!serviceType || !file) {
+                showMessage(messageDiv, 'Vui lòng chọn loại dịch vụ và tệp', 'error');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('customer_id', currentCustomerId);
+                formData.append('service_type', serviceType);
+                formData.append('title', `${serviceType.toUpperCase()} - ${new Date().toLocaleDateString('vi-VN')}`);
+                formData.append('file', file);
+                if (description) formData.append('description', description);
+
+                messageDiv.innerHTML = '<div class="loading"><div class="spinner"></div> Đang tải lên...</div>';
+
+                const response = await fetch(`${API_BASE}/requests`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Lỗi gửi yêu cầu');
+
+                const request = await response.json();
+                showMessage(messageDiv, `✓ Yêu cầu đã được gửi thành công (ID: ${request.id.substring(0, 8)})`, 'success');
+                
+                // Reset form
+                document.getElementById('serviceType').value = '';
+                document.getElementById('requestDescription').value = '';
+                audioFileInput.value = '';
+                fileUpload.querySelector('.upload-text').textContent = 'Kéo thả tệp hoặc nhấp để chọn';
+                
+                // Reload requests and dashboard
+                setTimeout(() => {
+                    loadRequests();
+                    loadDashboard();
+                }, 2000);
+            } catch (error) {
+                showMessage(messageDiv, 'Lỗi: ' + error.message, 'error');
+            }
+        }
+
+        // ==================== DASHBOARD ====================
+        async function loadDashboard() {
+            try {
+                const requestsResponse = await fetch(`${API_BASE}/requests/customer/${currentCustomerId}`);
+                const requests = await requestsResponse.ok ? await requestsResponse.json() : [];
+
+                // Calculate stats
+                const stats = {
+                    total: requests.length,
+                    completed: requests.filter(r => r.status === 'completed').length,
+                    processing: requests.filter(r => r.status === 'processing').length,
+                    pending: requests.filter(r => r.status === 'pending').length
+                };
+
+                // Display stats
+                const statsGrid = document.getElementById('statsGrid');
+                statsGrid.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.total}</div>
+                        <div class="stat-label">Tổng Đơn Hàng</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.pending}</div>
+                        <div class="stat-label">Chưa Xử Lý</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.processing}</div>
+                        <div class="stat-label">Đang Xử Lý</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${stats.completed}</div>
+                        <div class="stat-label">Hoàn Thành</div>
+                    </div>
+                `;
+
+                // Display recent requests
+                const recentRequests = document.getElementById('recentRequests');
+                if (requests.length === 0) {
+                    recentRequests.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Chưa có đơn hàng nào</p>';
+                } else {
+                    recentRequests.innerHTML = requests.slice(0, 5).map(req => `
+                        <div class="card">
+                            <div class="card-header">
+                                <div>
+                                    <div class="card-title">${req.service_type.toUpperCase()}</div>
+                                    <div class="card-meta">
+                                        <span>ID: ${req.id.substring(0, 8)}</span>
+                                        <span>${new Date(req.created_at).toLocaleDateString('vi-VN')}</span>
+                                    </div>
+                                </div>
+                                <span class="badge badge-${req.status}">${translateStatus(req.status)}</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${getProgressWidth(req.status)}%"></div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        // ==================== REQUEST TRACKING ====================
+        async function loadRequests() {
+            try {
+                const response = await fetch(`${API_BASE}/requests/customer/${currentCustomerId}`);
+                const requests = await response.ok ? await response.json() : [];
+
+                const messageDiv = document.getElementById('trackingMessage');
+                const requestsList = document.getElementById('requestsList');
+
+                if (requests.length === 0) {
+                    requestsList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Chưa có đơn hàng nào</p>';
+                    return;
+                }
+
+                requestsList.innerHTML = requests.map(req => `
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">
+                                    ${getServiceIcon(req.service_type)} ${req.service_type.toUpperCase()}
+                                </div>
+                                <div class="card-meta">
+                                    <span>ID: ${req.id}</span>
+                                    <span>Tạo: ${new Date(req.created_at).toLocaleDateString('vi-VN')}</span>
+                                </div>
+                            </div>
+                            <span class="badge badge-${req.status}">${translateStatus(req.status)}</span>
+                        </div>
+                        
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${getProgressWidth(req.status)}%"></div>
+                        </div>
+                        
+                        ${req.description ? `<p style="margin-top: 10px; color: #666; font-size: 14px;">📝 ${req.description}</p>` : ''}
+                        
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button class="btn btn-secondary" onclick="viewRequestDetails('${req.id}')">Xem Chi Tiết</button>
+                            ${req.status === 'pending' ? `<button class="btn btn-danger" onclick="cancelRequest('${req.id}')">Hủy Yêu Cầu</button>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading requests:', error);
+            }
+        }
+
+        async function viewRequestDetails(requestId) {
+            try {
+                const response = await fetch(`${API_BASE}/requests/${requestId}`);
+                const request = await response.json();
+                alert(`Chi tiết đơn hàng:\n\nID: ${request.id}\nLoại: ${request.service_type}\nTrạng thái: ${translateStatus(request.status)}\nTạo: ${new Date(request.created_at).toLocaleDateString('vi-VN')}`);
+            } catch (error) {
+                alert('Lỗi: ' + error.message);
+            }
+        }
+
+        async function cancelRequest(requestId) {
+            if (!confirm('Bạn có chắc muốn hủy yêu cầu này?')) return;
+            try {
+                const response = await fetch(`${API_BASE}/requests/${requestId}/status`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'cancelled' })
+                });
+                if (!response.ok) throw new Error('Lỗi hủy yêu cầu');
+                loadRequests();
+            } catch (error) {
+                alert('Lỗi: ' + error.message);
+            }
+        }
+
+        // ==================== PAYMENTS ====================
+        async function loadPayments() {
+            try {
+                // Fetch fresh data từ server
+                const requestsResponse = await fetch(`${API_BASE}/requests/customer/${currentCustomerId}?t=${Date.now()}`);
+                const requests = await requestsResponse.ok ? await requestsResponse.json() : [];
+
+                // Payment stats - đếm từ field 'paid' thực tế
+                const unpaidCount = requests.filter(r => r.paid === false || r.paid === 'false').length;
+                const paidCount = requests.filter(r => r.paid === true || r.paid === 'true').length;
+                const totalUnpaid = requests.filter(r => r.paid === false || r.paid === 'false').reduce((sum, r) => sum + 50000, 0);
+                const totalPaid = requests.filter(r => r.paid === true || r.paid === 'true').reduce((sum, r) => sum + 50000, 0);
+
+                const paymentStats = document.getElementById('paymentStats');
+                paymentStats.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-number">${unpaidCount}</div>
+                        <div class="stat-label">Chưa Thanh Toán</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${(totalUnpaid / 1000).toFixed(0)}K</div>
+                        <div class="stat-label">Tổng Nợ</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${paidCount}</div>
+                        <div class="stat-label">Đã Thanh Toán</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${(totalPaid / 1000).toFixed(0)}K</div>
+                        <div class="stat-label">Tổng Đã Trả</div>
+                    </div>
+                `;
+
+                // Unpaid requests - refresh cache
+                const unpaidRequests = document.getElementById('unpaidRequests');
+                const unpaid = requests.filter(r => r.paid === false || r.paid === 'false');
+                unpaidRequests.innerHTML = unpaid.length === 0 ? 
+                    '<p style="text-align: center; color: #999; padding: 20px;">✅ Không có đơn chưa thanh toán - Tất cả đã thanh toán!</p>' :
+                    unpaid.map(req => `
+                        <div class="card">
+                            <div class="card-header">
+                                <div>
+                                    <div class="card-title">${getServiceIcon(req.service_type)} ${req.service_type.toUpperCase()}</div>
+                                    <div class="card-meta">
+                                        <span>ID: ${req.id.substring(0, 8)}</span>
+                                        <span>Trạng thái: ${translateStatus(req.status)}</span>
+                                    </div>
+                                </div>
+                                <span class="badge badge-unpaid">Chưa Thanh Toán</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                                <div style="font-size: 18px; font-weight: bold; color: #667eea;">50,000 ₫</div>
+                                <button class="btn btn-primary" onclick="openPaymentModal('${req.id}')">💳 Thanh Toán Ngay</button>
+                            </div>
+                        </div>
+                    `).join('');
+
+                // Show paid requests
+                const paidRequests = requests.filter(r => r.paid === true || r.paid === 'true');
+                if (paidRequests.length > 0) {
+                    const paidSection = document.getElementById('unpaidRequests').parentElement;
+                    let paidHTML = '<h3 style="margin-top: 30px; margin-bottom: 20px;">✅ Các Đơn Đã Thanh Toán</h3>';
+                    paidHTML += paidRequests.map(req => `
+                        <div class="card" style="opacity: 0.8;">
+                            <div class="card-header">
+                                <div>
+                                    <div class="card-title">${getServiceIcon(req.service_type)} ${req.service_type.toUpperCase()}</div>
+                                    <div class="card-meta">
+                                        <span>ID: ${req.id.substring(0, 8)}</span>
+                                        <span>Trạng thái: ${translateStatus(req.status)}</span>
+                                    </div>
+                                </div>
+                                <span class="badge" style="background:#4caf50; color:white;">Đã Thanh Toán</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                                <div style="font-size: 18px; font-weight: bold; color: #4caf50;">50,000 ₫</div>
+                                <span style="color:#999; font-size:13px;">Thanh toán thành công</span>
+                            </div>
+                        </div>
+                    `).join('');
+                    paidSection.innerHTML += paidHTML;
+                }
+
+                // Transactions
+                loadTransactions();
+            } catch (error) {
+                console.error('Error loading payments:', error);
+            }
+        }
+
+        async function loadTransactions() {
+            try {
+                // Get all transactions for this customer
+                const response = await fetch(`${API_BASE}/transactions/${currentCustomerId}`);
+                const transactions = await response.ok ? await response.json() : [];
+
+                const tbody = document.getElementById('transactionsBody');
+                tbody.innerHTML = transactions.map(trans => `
+                    <tr>
+                        <td>${new Date(trans.created_at).toLocaleDateString('vi-VN')}</td>
+                        <td>${trans.payment_id.substring(0, 8)}</td>
+                        <td>${trans.request_id.substring(0, 8)}</td>
+                        <td style="font-weight: bold; color: #667eea;">${(trans.amount / 1000).toFixed(0)}K ₫</td>
+                        <td><span class="badge badge-paid">${translateStatus(trans.status)}</span></td>
+                    </tr>
+                `).join('');
+
+                if (transactions.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999; padding: 20px;">Chưa có giao dịch nào</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+            }
+        }
+
+        function openPaymentModal(requestId) {
+            const modalBody = document.getElementById('paymentModalBody');
+            modalBody.innerHTML = `
+                <form onsubmit="processPayment(event, '${requestId}')">
+                    <div class="form-group">
+                        <label>Số Tiền: 50,000 ₫</label>
+                    </div>
+                    <div class="form-group">
+                        <label>Phương Thức Thanh Toán *</label>
+                        <select id="paymentMethod" required>
+                            <option value="">-- Chọn Phương Thức --</option>
+                            <option value="credit_card">💳 Thẻ Tín Dụng</option>
+                            <option value="bank_transfer">🏦 Chuyển Khoản Ngân Hàng</option>
+                            <option value="wallet">💰 Ví Điện Tử</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Tên Người Thanh Toán</label>
+                        <input type="text" id="payerName" placeholder="Nhập tên">
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">✓ Xác Nhận Thanh Toán</button>
+                        <button type="button" class="btn btn-secondary" onclick="closePaymentModal()" style="flex: 1;">✕ Hủy</button>
+                    </div>
+                </form>
+            `;
+            document.getElementById('paymentModal').classList.add('active');
+        }
+
+        async function processPayment(event, requestId) {
+            event.preventDefault();
+            const method = document.getElementById('paymentMethod').value;
+            const payer = document.getElementById('payerName').value.trim();
+
+            if (!method) {
+                alert('Vui lòng chọn phương thức thanh toán');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/payments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        customer_id: currentCustomerId,
+                        service_request_id: requestId,
+                        amount: '50000',
+                        payment_method: method
+                    })
+                });
+
+                if (!response.ok) throw new Error('Lỗi xử lý thanh toán');
+
+                // Đợi 1 giây để backend lưu xong
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                alert('✓ Thanh toán thành công!');
+                closePaymentModal();
+                
+                // Reload tất cả dữ liệu từ cache break
+                await loadPayments();
+                await loadRequests();
+                await loadDashboard();
+                
+            } catch (error) {
+                alert('Lỗi: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').classList.remove('active');
+        }
+
+        // ==================== FEEDBACK ====================
+        async function loadFeedback() {
+            try {
+                // Load requests for feedback dropdown
+                const requestsResponse = await fetch(`${API_BASE}/requests/customer/${currentCustomerId}`);
+                const requests = await requestsResponse.ok ? await requestsResponse.json() : [];
+
+                const feedbackSelect = document.getElementById('feedbackRequestId');
+                feedbackSelect.innerHTML = '<option value="">-- Chọn Đơn Hàng --</option>' +
+                    requests.map(req => `<option value="${req.id}">${req.service_type} - ${req.id.substring(0, 8)} (${translateStatus(req.status)})</option>`).join('');
+
+                // Load feedback history
+                const feedbackResponse = await fetch(`${API_BASE}/feedback/customer/${currentCustomerId}`);
+                const feedbacks = await feedbackResponse.ok ? await feedbackResponse.json() : [];
+
+                const feedbackHistory = document.getElementById('feedbackHistory');
+                if (feedbacks.length === 0) {
+                    feedbackHistory.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Chưa có phản hồi nào</p>';
+                    return;
+                }
+
+                feedbackHistory.innerHTML = feedbacks.map(fb => `
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">${fb.feedback_type === 'revision' ? '✏️ Yêu Cầu Chỉnh Sửa' : fb.feedback_type === 'bug' ? '🐛 Báo Lỗi' : '💡 Đề Xuất'}</div>
+                                <div class="card-meta">
+                                    <span>Đơn: ${fb.request_id.substring(0, 8)}</span>
+                                    <span>${new Date(fb.created_date).toLocaleDateString('vi-VN')}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p style="margin: 0; color: #666; line-height: 1.6;">${fb.content}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading feedback:', error);
+            }
+        }
+
+        async function submitFeedback() {
+            const requestId = document.getElementById('feedbackRequestId').value;
+            const content = document.getElementById('feedbackContent').value.trim();
+            const type = document.getElementById('feedbackType').value;
+            const messageDiv = document.getElementById('feedbackMessage');
+
+            if (!requestId || !content || !type) {
+                showMessage(messageDiv, 'Vui lòng điền đầy đủ thông tin', 'error');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('request_id', requestId);
+                formData.append('content', content);
+                formData.append('feedback_type', type);
+
+                const response = await fetch(`${API_BASE}/feedback`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Lỗi gửi phản hồi');
+
+                showMessage(messageDiv, '✓ Phản hồi đã được gửi thành công', 'success');
+                document.getElementById('feedbackRequestId').value = '';
+                document.getElementById('feedbackContent').value = '';
+                document.getElementById('feedbackType').value = '';
+                
+                setTimeout(() => loadFeedback(), 2000);
+            } catch (error) {
+                showMessage(messageDiv, 'Lỗi: ' + error.message, 'error');
+            }
+        }
+
+        async function loadFeedbackHistory() {
+            try {
+                // Feedback history is now loaded in loadFeedback()
+                return;
+            } catch (error) {
+                console.error('Error loading feedback history:', error);
+            }
+        }
+
+        // ==================== UTILITY FUNCTIONS ====================
+        function translateStatus(status) {
+            const statusMap = {
+                'pending': '⏳ Chưa Xử Lý',
+                'processing': '⚙️ Đang Xử Lý',
+                'completed': '✅ Hoàn Thành',
+                'cancelled': '❌ Đã Hủy',
+                'paid': '✅ Đã Thanh Toán',
+                'unpaid': '❌ Chưa Thanh Toán'
+            };
+            return statusMap[status] || status;
+        }
+
+        function getServiceIcon(serviceType) {
+            const icons = {
+                'transcription': '🎤',
+                'arrangement': '🎼',
+                'recording': '🎙️'
+            };
+            return icons[serviceType] || '📁';
+        }
+
+        function getProgressWidth(status) {
+            const progress = {
+                'pending': 25,
+                'processing': 75,
+                'completed': 100,
+                'cancelled': 0
+            };
+            return progress[status] || 0;
+        }
+
+        function showMessage(element, message, type) {
+            element.innerHTML = `<div class="message ${type}">${message}</div>`;
+            setTimeout(() => {
+                element.innerHTML = '';
+            }, 5000);
+        }
+
+        // Close payment modal when clicking outside
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('paymentModal');
+            if (e.target === modal) {
+                closePaymentModal();
+            }
+        });
+    </script>
+</body>
+</html>

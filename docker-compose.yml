@@ -24,7 +24,7 @@ services:
   # -------------------------
   auth-service:
     build:
-      context: ./https---github.com-lznguyn-Service
+      context: ./service-1
     container_name: auth-service
     ports:
       - "8081:8081"
@@ -36,7 +36,7 @@ services:
   # -------------------------
   customer-service:
     build:
-      context: ./XDOOP
+      context: ./service-2
     container_name: customer-service
     ports:
       - "8082:8082"

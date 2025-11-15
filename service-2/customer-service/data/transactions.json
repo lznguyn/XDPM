@@ -1,0 +1,13 @@
+[
+  {
+    "id": "9ddb07e1-715f-4744-8a50-4fe04d57492c",
+    "customer_id": "b47967a5-04b3-4573-9a27-e5704310bfed",
+    "description": "Payment for ffa27182-791c-47b4-9bfa-0efae8db1d0a",
+    "amount": 50000.0,
+    "transaction_type": "payment",
+    "date": "2025-11-12T03:08:04.723613",
+    "payment_id": "e597a4a8-cbc9-480a-a710-a9b85c99b6d6",
+    "request_id": "ffa27182-791c-47b4-9bfa-0efae8db1d0a",
+    "status": "completed"
+  }
+]

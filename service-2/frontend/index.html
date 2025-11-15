@@ -1,0 +1,400 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Music Transcriber — Improved UI</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --bg: #b38df9; --card: #ffffff; --muted: #475569; --accent: #06b6d4;
+      font-family: Inter, Roboto, "Helvetica Neue", Arial;
+    }
+    body{ background: linear-gradient(180deg,#ffffff 0%, #f1f5f9 100%); color:#0f1724; margin:0; padding:28px; min-height:100vh; display:flex; justify-content:center; }
+    .container{ width:100%; max-width:1000px; }
+    .card{ background:var(--card); border-radius:12px; padding:16px; box-shadow: 0 8px 28px rgba(15,23,42,0.06); margin-bottom:14px; }
+    .row{ display:flex; gap:12px; align-items:center; }
+    input[type=file]{ color:inherit; }
+    button{ background:var(--accent); color:#ffffff; border:0; padding:8px 12px; border-radius:8px; cursor:pointer; font-weight:600; }
+    #out{ white-space:pre-wrap; color:var(--muted); font-family: monospace; margin-top:8px; }
+    .notes-table{ width:100%; border-collapse:collapse; margin-top:8px; }
+    .notes-table th,.notes-table td{ text-align:left; padding:8px; font-size:13px; color:#0f1724; border-bottom:1px solid rgba(15,23,42,0.06); }
+    .muted { color:var(--muted); font-size:13px; }
+    #canvasWrap{ width:100%; overflow:auto; background:linear-gradient(180deg, rgba(2,6,23,0.03), rgba(2,6,23,0.01)); border-radius:8px; padding:8px; }
+    canvas{ background: linear-gradient(180deg, rgba(15,23,42,0.03), rgba(15,23,42,0.01)); border-radius:6px; display:block; }
+    .progress{ height:8px; background:rgba(15,23,42,0.06); border-radius:999px; overflow:hidden; }
+    .progress > i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,#7dd3fc,#06b6d4); transition: width .2s; }
+    .small{ font-size:13px; color:var(--muted); }
+    a.link{ color:var(--accent); text-decoration:none; font-weight:600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+      <h1>🎵 MuTraPro Music Transcriber</h1>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="index.html" style="padding: 8px 16px; background: #06b6d4; color: white; border-radius: 8px; text-decoration: none; font-weight: 600;">🎤 Transcriber</a>
+        <a href="auth.html" style="padding: 8px 16px; background: #667eea; color: white; border-radius: 8px; text-decoration: none; font-weight: 600;">👤 Customer Portal</a>
+        <a href="guide.html" style="padding: 8px 16px; background: #e76f51; color: white; border-radius: 8px; text-decoration: none; font-weight: 600;">📚 Guide</a>
+        <button id="logoutBtn" style="padding: 8px 16px; background: #f44336; color: white; border-radius: 8px; border: 0; cursor: pointer; font-weight: 600; display: none;" onclick="logoutFromTranscriber()">🚪 Logout</button>
+      </div>
+    </header>
+
+    <div class="card">
+      <div class="row">
+        <input id="file" type="file" accept=".wav,.mp3,.flac,.ogg,.aiff"/>
+        <button id="sendBtn">Transcribe</button>
+        <div style="flex:1"></div>
+        <div class="small muted">API: <span id="apiUrl">/trans</span></div> 
+      </div>
+
+      <div style="margin-top:10px;">
+        <div class="progress"><i id="bar"></i></div>
+      </div>
+
+      <div id="out" class="small muted card" style="margin-top:12px;">
+        Chưa có kết quả. Chọn file audio và bấm "Transcribe".
+      </div>
+
+      <!-- Save to Customer Portal Option -->
+      <div id="saveToCustomerSection" style="display:none; margin-top:20px; padding:15px; background:#f0f4ff; border-radius:8px; border-left:4px solid #667eea;">
+        <div style="display:flex; align-items:center; gap:15px;">
+          <div style="flex:1;">
+            <strong>💾 Lưu kết quả vào Hồ sơ</strong>
+            <p style="margin:5px 0 0 0; color:#666; font-size:13px;">File đã chuyển đổi sẽ được lưu vào hồ sơ khách hàng</p>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button id="saveBtn" class="btn" style="background:#667eea; color:white; padding:8px 16px; border:0; border-radius:6px; cursor:pointer; font-weight:600;">📤 Lưu</button>
+          </div>
+        </div>
+        <div id="saveMessage" style="margin-top:10px; font-size:13px;"></div>
+      </div>
+    </div>
+
+    <div id="visualArea" style="display:none;">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div><strong>Kết quả phân tích nốt</strong> <span class="muted small" id="meta"></span></div>
+          <div><a id="midiLink" class="link" href="#" target="_blank" style="display:none">Tải MIDI</a></div>
+        </div>
+
+        <div id="canvasWrap" style="margin-top:12px;">
+          <canvas id="prCanvas" height="280"></canvas>
+        </div>
+
+        <table class="notes-table" id="notesTable">
+          <thead><tr><th>#</th><th>Nốt</th><th>Bắt đầu (s)</th><th>Kết thúc (s)</th><th>Độ dài (s)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+  API endpoint configuration:
+  - Default: http://localhost:8000 (backend API server)
+  - Frontend runs on 8080, backend on 8000
+  - Override via API_BASE_OVERRIDE if needed
+*/
+const API_BASE = (typeof API_BASE_OVERRIDE !== 'undefined') ? API_BASE_OVERRIDE : 'http://localhost:8000';
+const CUSTOMER_API_BASE = (typeof CUSTOMER_API_OVERRIDE !== 'undefined') ? CUSTOMER_API_OVERRIDE : 'http://localhost:8001';
+const API = API_BASE + '/api/v1/trans';
+document.getElementById('apiUrl').innerText = API;
+
+const fileInput = document.getElementById('file');
+const sendBtn = document.getElementById('sendBtn');
+const out = document.getElementById('out');
+const bar = document.getElementById('bar');
+const visualArea = document.getElementById('visualArea');
+const notesTableBody = document.querySelector('#notesTable tbody');
+const prCanvas = document.getElementById('prCanvas');
+const midiLink = document.getElementById('midiLink');
+const meta = document.getElementById('meta');
+const saveBtn = document.getElementById('saveBtn');
+const saveSection = document.getElementById('saveToCustomerSection');
+const saveMessage = document.getElementById('saveMessage');
+
+// Lưu dữ liệu kết quả transcribe tạm thời
+let lastTranscribeResult = null;
+let lastFileName = null;
+
+function setProgress(p){ bar.style.width = Math.max(0, Math.min(100,p*100)) + '%'; }
+
+function noteNameToMidi(note){
+  const letters = {'C':0,'C#':1,'D':2,'D#':3,'E':4,'F':5,'F#':6,'G':7,'G#':8,'A':9,'A#':10,'B':11};
+  const m = note.match(/^([A-G]#?)(-?\d+)/);
+  if(!m) return null;
+  const name = m[1], oct = parseInt(m[2],10);
+  return (oct+1)*12 + letters[name];
+}
+
+function drawPianoRoll(events){
+  const ctx = prCanvas.getContext('2d');
+  const minT = 0;
+  const maxT = Math.max(...events.map(e=>e.end), 1);
+  const midiVals = events.map(e=>noteNameToMidi(e.note)).filter(v=>v!==null);
+  const minP = Math.min(...midiVals) - 2;
+  const maxP = Math.max(...midiVals) + 2;
+
+  const w = Math.max(800, Math.round((Math.max(4, maxT))*120));
+  prCanvas.width = w;
+  prCanvas.height = 280;
+  ctx.clearRect(0,0,prCanvas.width, prCanvas.height);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.02)';
+  ctx.fillRect(0,0,prCanvas.width, prCanvas.height);
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 1;
+  const pxPerSec = prCanvas.width / (maxT - minT + 1e-6);
+  for(let s=0; s<=Math.ceil(maxT); s++){
+    const x = Math.round(s * pxPerSec) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, prCanvas.height);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.font = '11px Inter, Arial';
+    ctx.fillText(s + 's', x+4, 12);
+  }
+
+  const pitchSpan = maxP - minP + 1;
+  const rowH = prCanvas.height / pitchSpan;
+  ctx.strokeStyle = 'rgba(0,0,0,0.04)';
+  for(let i=0;i<pitchSpan;i++){
+    const y = i*rowH;
+    ctx.beginPath();
+    ctx.moveTo(0, Math.round(y)+0.5);
+    ctx.lineTo(prCanvas.width, Math.round(y)+0.5);
+    ctx.stroke();
+  }
+
+  for(let ev of events){
+    const midi = noteNameToMidi(ev.note);
+    if(midi===null) continue;
+    const px = (ev.start - minT) * pxPerSec;
+    const pw = Math.max(3, (ev.end - ev.start) * pxPerSec);
+    const py = (maxP - midi) * rowH;
+    const hue = 200 - ((midi % 12) / 12) * 120;
+    ctx.fillStyle = `hsla(${hue}, 80%, 60%, 0.9)`;
+    const r = Math.max(2, rowH/4);
+    const height = Math.max(6, rowH-4);
+    roundRect(ctx, px+2, py+2, pw-4, height, r);
+    ctx.fillStyle = 'rgba(2,6,23,0.9)';
+    ctx.font = '11px Inter, Arial';
+    ctx.fillText(ev.note, px+6, py+height-6);
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y, x+w,y+h, r);
+  ctx.arcTo(x+w,y+h, x,y+h, r);
+  ctx.arcTo(x,y+h, x,y, r);
+  ctx.arcTo(x,y, x+w,y, r);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function clearResults(){ notesTableBody.innerHTML = ''; visualArea.style.display = 'none'; midiLink.style.display = 'none'; }
+
+function makeAbsoluteUrl(path){
+  if(!path) return null;
+  if(path.startsWith('http://') || path.startsWith('https://')) return path;
+  // if path starts with '/', prefix API_BASE
+  if(path.startsWith('/')) return API_BASE + path;
+  // otherwise relative path
+  return API_BASE + '/' + path;
+}
+
+function displayResults(events, midi_file){
+  notesTableBody.innerHTML = '';
+  events.forEach((ev,i)=>{
+    const tr = document.createElement('tr');
+    const tdIdx = document.createElement('td'); tdIdx.innerText = (i+1);
+    const tdNote = document.createElement('td'); tdNote.innerText = ev.note;
+    const tdStart = document.createElement('td'); tdStart.innerText = ev.start.toFixed(3);
+    const tdEnd = document.createElement('td'); tdEnd.innerText = ev.end.toFixed(3);
+    const tdDur = document.createElement('td'); tdDur.innerText = (ev.end-ev.start).toFixed(3);
+    tr.appendChild(tdIdx); tr.appendChild(tdNote); tr.appendChild(tdStart); tr.appendChild(tdEnd); tr.appendChild(tdDur);
+    notesTableBody.appendChild(tr);
+  });
+  meta.innerText = `Tổng ${events.length} nốt — thời lượng: ${ (Math.max(...events.map(e=>e.end))).toFixed(3) } s`;
+  if(midi_file){
+    midiLink.href = makeAbsoluteUrl(midi_file);
+    midiLink.style.display = 'inline';
+    midiLink.download = midi_file.split('/').pop();
+  } else midiLink.style.display = 'none';
+
+  visualArea.style.display = 'block';
+  drawPianoRoll(events);
+}
+
+sendBtn.onclick = async ()=>{
+  if(!fileInput.files || fileInput.files.length===0){ alert("Chọn file audio trước"); return; }
+  const f = fileInput.files[0];
+  clearResults();
+  out.innerText = `Uploading ${f.name} ...`;
+  setProgress(0.05);
+
+  const form = new FormData();
+  form.append('file', f, f.name);
+
+  try{
+    const resp = await fetch(API, { method:'POST', body: form });
+    if(!resp.ok) throw new Error('Server trả lỗi ' + resp.status);
+    setProgress(0.5);
+    const j = await resp.json();
+    setProgress(0.9);
+
+    let events = null;
+    // server now returns `events` (list of dicts). Accept both j.events and j.notes for backward compatibility.
+    if((j.events && Array.isArray(j.events)) || (j.notes && Array.isArray(j.notes))){
+      const raw = j.events && Array.isArray(j.events) ? j.events : j.notes;
+      // raw may be list of dicts or lists
+      events = raw.map(item=>{
+        if(Array.isArray(item)) return {note: item[0], start: parseFloat(item[1]), end: parseFloat(item[2])};
+        if(typeof item === 'object') return {note: item.note || item.name || item[0], start: parseFloat(item.start || item[1] || 0), end: parseFloat(item.end || item[2] || (item.start ? item.start + 0.0 : 0))};
+        return null;
+      }).filter(Boolean);
+    } else if(j.transcription_text && typeof j.transcription_text === 'string'){
+      const parts = j.transcription_text.trim().split(/\s+/).filter(Boolean);
+      let cursor = 0.0;
+      events = [];
+      for(const p of parts){
+        const m = p.match(/^([A-G]#?\-?\d+)\((\d*\.?\d+)s\)$/);
+        if(!m) continue;
+        const note = m[1];
+        const dur = parseFloat(m[2]);
+        const start = cursor;
+        const end = cursor + dur;
+        events.push({note, start, end});
+        cursor = end;
+      }
+      if(events.length===0 && j.transcription_text){
+        out.innerText = "Không parse được transcription_text tự động — nội dung:\n" + j.transcription_text;
+      }
+    } else {
+      out.innerText = "Không nhận được dữ liệu nốt từ server. Phần trả về:\n" + JSON.stringify(j, null, 2);
+    }
+
+    out.innerText = "Hoàn tất.";
+    setProgress(1.0);
+
+    if(events && events.length>0){
+      events = events.sort((a,b)=>a.start - b.start);
+      // accept j.midi_file string (like "/outputs/xxx.mid")
+      displayResults(events, j.midi_file ? j.midi_file : null);
+      
+      // Lưu kết quả để có thể gửi tới customer portal
+      lastTranscribeResult = {
+        events: events,
+        midi_file: j.midi_file ? j.midi_file : null,
+        transcription_text: j.transcription_text || ""
+      };
+      lastFileName = f.name;
+      
+      // Hiện nút lưu
+      saveSection.style.display = 'block';
+    }
+  }catch(err){
+    console.error(err);
+    out.innerText = "Lỗi: " + err;
+    setProgress(0);
+  }
+};
+
+// Function để lưu kết quả vào Customer Portal
+async function saveToCustomerPortal() {
+  if (!lastTranscribeResult) {
+    showSaveMessage("Không có kết quả transcribe để lưu", "error");
+    return;
+  }
+  
+  // Kiểm tra xem user có login không
+  const customerId = localStorage.getItem('customerId');
+  const customerName = localStorage.getItem('customerName');
+  
+  if (!customerId) {
+    showSaveMessage("⚠️ Vui lòng đăng nhập vào Cổng Khách Hàng trước", "error");
+    setTimeout(() => {
+      window.location.href = 'auth.html';
+    }, 1000);
+    return;
+  }
+  
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '⏳ Đang lưu...';
+  
+  try {
+    const formData = new FormData();
+    formData.append('customer_id', customerId);
+    formData.append('service_type', 'transcription');
+    formData.append('title', `Transcribe - ${lastFileName}`);
+    formData.append('description', `
+      Dữ liệu: ${lastTranscribeResult.events.length} nốt
+      Thời lượng: ${lastTranscribeResult.events.length > 0 ? Math.max(...lastTranscribeResult.events.map(e => e.end)).toFixed(3) : 0}s
+      
+Transcription Text:
+${lastTranscribeResult.transcription_text}
+    `);
+    
+    const response = await fetch(`${CUSTOMER_API_BASE}/requests/customer/${customerId}`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Server error: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    showSaveMessage(`✅ Đã lưu vào Cổng Khách Hàng! ID: ${result.id.substring(0, 8)}`, "success");
+    
+    setTimeout(() => {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '📤 Lưu';
+    }, 2000);
+    
+  } catch (error) {
+    console.error('Error saving to customer portal:', error);
+    showSaveMessage(`❌ Lỗi: ${error.message}`, "error");
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '📤 Lưu';
+  }
+}
+
+function showSaveMessage(message, type) {
+  saveMessage.innerHTML = `<div style="padding:8px 12px; border-radius:6px; background:${type === 'success' ? '#d4edda' : '#f8d7da'}; color:${type === 'success' ? '#155724' : '#721c24'}; font-size:13px;">${message}</div>`;
+}
+
+// Gắn event listener cho nút lưu
+saveBtn.onclick = saveToCustomerPortal;
+
+// Kiểm tra session khi load trang
+function checkLoginStatus() {
+  const customerId = localStorage.getItem('customerId');
+  const customerName = localStorage.getItem('customerName');
+  
+  if (customerId) {
+    document.getElementById('dashboardLink').style.display = 'inline-block';
+    document.getElementById('dashboardLink').href = 'customer-dashboard.html';
+    document.getElementById('logoutBtn').style.display = 'inline-block';
+  } else {
+    document.getElementById('dashboardLink').style.display = 'none';
+    document.getElementById('logoutBtn').style.display = 'none';
+  }
+}
+
+function logoutFromTranscriber() {
+  localStorage.removeItem('customerId');
+  localStorage.removeItem('customerName');
+  alert('✓ Đã logout');
+  location.reload();
+}
+
+// Gọi kiểm tra khi trang load
+checkLoginStatus();
+</script>
+</body>
+</html>

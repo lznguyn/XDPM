@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MuTraPro - Đăng Ký</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-width: 450px;
+            width: 100%;
+            padding: 40px;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .logo p {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .message.success {
+            background: #d3f9d8;
+            color: #2f9e44;
+            border-left: 4px solid #2f9e44;
+        }
+
+        .message.error {
+            background: #ffe0e6;
+            color: #c92a2a;
+            border-left: 4px solid #c92a2a;
+        }
+
+        .message.info {
+            background: #d0ebff;
+            color: #1971c2;
+            border-left: 4px solid #1971c2;
+        }
+
+        .links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .links a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .form-row .form-group {
+            margin-bottom: 0;
+        }
+
+        .spinner {
+            border: 3px solid #f0f0f0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .info-box {
+            background: #f0f1ff;
+            border-left: 4px solid #667eea;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+
+            .logo h1 {
+                font-size: 24px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>🎵 MuTraPro</h1>
+            <p>Nền tảng quản lý dịch vụ âm nhạc</p>
+        </div>
+
+        <div id="message"></div>
+
+        <div class="info-box">
+            ℹ️ Tạo tài khoản mới bằng Email của bạn. Hệ thống sẽ tự động tạo nếu chưa tồn tại.
+        </div>
+
+        <form onsubmit="handleSignUp(event)">
+            <div class="form-group">
+                <label for="signupEmail">Email *</label>
+                <input type="email" id="signupEmail" placeholder="Nhập email của bạn" required>
+            </div>
+
+            <div class="form-group">
+                <label for="signupName">Tên Khách Hàng *</label>
+                <input type="text" id="signupName" placeholder="Nhập tên của bạn" required>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="signupPhone">Điện Thoại</label>
+                    <input type="tel" id="signupPhone" placeholder="(Tùy chọn)">
+                </div>
+                <div class="form-group">
+                    <label for="signupAddress">Địa Chỉ</label>
+                    <input type="text" id="signupAddress" placeholder="(Tùy chọn)">
+                </div>
+            </div>
+
+            <button type="submit" class="btn" id="signupBtn">Tạo Tài Khoản</button>
+        </form>
+
+        <div class="links">
+            Đã có tài khoản? <a href="login.html">Đăng Nhập</a>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001';
+
+        async function handleSignUp(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('signupEmail').value.trim();
+            const name = document.getElementById('signupName').value.trim();
+            const phone = document.getElementById('signupPhone').value.trim();
+            const address = document.getElementById('signupAddress').value.trim();
+            const messageDiv = document.getElementById('message');
+            const btn = document.getElementById('signupBtn');
+
+            if (!email || !name) {
+                showMessage(messageDiv, 'Vui lòng nhập email và tên', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Đang tạo...';
+
+            try {
+                const formData = new FormData();
+                formData.append('name', name);
+                formData.append('email', email);
+                if (phone) formData.append('phone', phone);
+                if (address) formData.append('address', address);
+
+                const response = await fetch(`${API_BASE}/customers`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    if (response.status === 400) {
+                        throw new Error('Email đã tồn tại. Vui lòng sử dụng email khác hoặc đăng nhập.');
+                    }
+                    throw new Error('Lỗi tạo tài khoản. Vui lòng thử lại.');
+                }
+
+                const customer = await response.json();
+                
+                // Lưu session
+                localStorage.setItem('customerId', customer.id);
+                localStorage.setItem('customerName', customer.name);
+                
+                showMessage(messageDiv, '✓ Tài khoản tạo thành công! Đang chuyển hướng...', 'success');
+                
+                setTimeout(() => {
+                    window.location.href = 'customer-dashboard.html';
+                }, 1500);
+
+            } catch (error) {
+                showMessage(messageDiv, '❌ ' + error.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = 'Tạo Tài Khoản';
+            }
+        }
+
+        function showMessage(element, message, type) {
+            element.innerHTML = `<div class="message ${type}">${message}</div>`;
+        }
+    </script>
+</body>
+</html>

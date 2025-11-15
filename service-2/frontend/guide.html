@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MuTraPro - Hướng Dẫn</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .sidebar {
+            display: flex;
+            gap: 20px;
+            min-height: 100vh;
+        }
+
+        .sidebar-menu {
+            width: 250px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .sidebar-menu h2 {
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .menu-item {
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .menu-item:hover,
+        .menu-item.active {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateX(5px);
+        }
+
+        .content {
+            flex: 1;
+            padding: 40px;
+            overflow-y: auto;
+            max-height: 100vh;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: #849cf2;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+
+        h3 {
+            color: #764ba2;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        p {
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        li {
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 8px;
+        }
+
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #d63384;
+            font-family: 'Courier New', monospace;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border-left: 4px solid #667eea;
+        }
+
+        pre code {
+            color: #333;
+            background: none;
+            padding: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid;
+        }
+
+        .alert-info {
+            background: #d0ebff;
+            color: #1971c2;
+            border-left-color: #1971c2;
+        }
+
+        .alert-success {
+            background: #d3f9d8;
+            color: #2f9e44;
+            border-left-color: #2f9e44;
+        }
+
+        .alert-warning {
+            background: #fff3bf;
+            color: #e67700;
+            border-left-color: #e67700;
+        }
+
+        .alert-error {
+            background: #ffe0e6;
+            color: #c92a2a;
+            border-left-color: #c92a2a;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                flex-direction: column;
+            }
+
+            .sidebar-menu {
+                width: 100%;
+            }
+
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-menu">
+                <h2>📚 Hướng Dẫn</h2>
+                <div class="menu-item active" onclick="showSection('overview')">🎯 Tổng Quan</div>
+                <div class="menu-item" onclick="showSection('login')">🔐 Đăng Nhập</div>
+                <div class="menu-item" onclick="showSection('dashboard')">📊 Bảng Điều Khiển</div>
+                <div class="menu-item" onclick="showSection('profile')">👤 Hồ Sơ</div>
+                <div class="menu-item" onclick="showSection('upload')">📁 Tạo Yêu Cầu</div>
+                <div class="menu-item" onclick="showSection('tracking')">📋 Theo Dõi</div>
+                <div class="menu-item" onclick="showSection('payment')">💰 Thanh Toán</div>
+                <div class="menu-item" onclick="showSection('feedback')">💬 Phản Hồi</div>
+                <div class="menu-item" onclick="showSection('troubleshoot')">🐛 Khắc Phục</div>
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid rgba(255,255,255,0.2);">
+                <div class="menu-item" onclick="goToDashboard()">→ Tới Dashboard</div>
+                <div class="menu-item" onclick="goToTranscriber()">→ Tới Transcriber</div>
+            </div>
+
+            <div class="content">
+                <a href="#" class="back-link">← Quay Lại</a>
+
+                <!-- Overview Section -->
+                <div id="overview" style="display: block;">
+                    <h1>🎯 MuTraPro Customer Portal</h1>
+                    <p>Chào mừng đến với MuTraPro Customer Portal - giao diện quản lý dịch vụ âm nhạc toàn diện của bạn.</p>
+                    
+                    <h2>Các Tính Năng Chính</h2>
+                    <ul>
+                        <li>✅ <strong>Quản Lý Hồ Sơ</strong> - Cập nhật thông tin cá nhân</li>
+                        <li>✅ <strong>Tạo Yêu Cầu</strong> - Tải lên file và đặt đơn dịch vụ</li>
+                        <li>✅ <strong>Theo Dõi Đơn</strong> - Xem tiến độ xử lý</li>
+                        <li>✅ <strong>Thanh Toán</strong> - Quản lý thanh toán an toàn</li>
+                        <li>✅ <strong>Phản Hồi</strong> - Gửi yêu cầu chỉnh sửa hoặc báo lỗi</li>
+                    </ul>
+
+                    <h2>Dịch Vụ Có Sẵn</h2>
+                    <table>
+                        <tr>
+                            <th>Dịch Vụ</th>
+                            <th>Mô Tả</th>
+                            <th>Giá</th>
+                            <th>Thời Gian</th>
+                        </tr>
+                        <tr>
+                            <td>🎤 Phiên Âm</td>
+                            <td>Chuyển âm thành văn bản</td>
+                            <td>50,000 ₫</td>
+                            <td>1-2 ngày</td>
+                        </tr>
+                        <tr>
+                            <td>🎼 Phối khí </td>
+                            <td>Phối khí/remix nhạc</td>
+                            <td>50,000 ₫</td>
+                            <td>2-5 ngày</td>
+                        </tr>
+                        <tr>
+                            <td>🎙️ Thu Âm</td>
+                            <td>Thu âm chuyên nghiệp</td>
+                            <td>50,000 ₫</td>
+                            <td>3-7 ngày</td>
+                        </tr>
+                    </table>
+
+                    <div class="button-group">
+                        <button class="btn btn-primary" onclick="goToDashboard()">→ Tới Dashboard Ngay</button>
+                    </div>
+                </div>
+
+
+                <!-- Login Section -->
+                <div id="login" style="display: none;">
+                    <h1>🔐 Đăng Nhập & Tạo Tài Khoản</h1>
+                    
+                    <h2>Lần Đầu Tiên</h2>
+                    <ol>
+                        <li>Nhập <strong>Email</strong> của bạn</li>
+                        <li>Nhập <strong>Tên</strong> của bạn</li>
+                        <li>Nhấp <strong>"Đăng Nhập / Tạo Tài Khoản"</strong></li>
+                    </ol>
+
+                    <div class="alert alert-info">
+                        <strong>ℹ️ Lưu Ý:</strong> Hệ thống tự động tạo tài khoản nếu email chưa tồn tại
+                    </div>
+
+                    <h2>Lần Tiếp Theo</h2>
+                    <p>Đơn giản nhập email và tên - hệ thống sẽ tìm tài khoản của bạn</p>
+
+                    <div class="alert alert-warning">
+                        <strong>⚠️ Cảnh báo:</strong> Email là định danh duy nhất - lưu giữ an toàn
+                    </div>
+                </div>
+
+                <!-- Dashboard Section -->
+                <div id="dashboard" style="display: none;">
+                    <h1>📊 Bảng Điều Khiển</h1>
+                    
+                    <h2>Thông Tin Hiển Thị</h2>
+                    <ul>
+                        <li>📈 <strong>Tổng Đơn Hàng</strong> - Số lượng tất cả đơn đã gửi</li>
+                        <li>⏳ <strong>Chưa Xử Lý</strong> - Số đơn mới nhận</li>
+                        <li>⚙️ <strong>Đang Xử Lý</strong> - Số đơn đang được xử lý</li>
+                        <li>✅ <strong>Hoàn Thành</strong> - Số đơn đã hoàn thành</li>
+                    </ul>
+
+                    <h2>Đơn Hàng Gần Đây</h2>
+                    <p>Hiển thị 5 đơn mới nhất với:</p>
+                    <ul>
+                        <li>Loại dịch vụ (🎤 Phiên Âm, 🎼 Phối khí, 🎙️ Thu Âm)</li>
+                        <li>Mã ID và ngày tạo</li>
+                        <li>Trạng thái hiện tại</li>
+                        <li>Thanh tiến độ (%) trực quan</li>
+                    </ul>
+                </div>
+
+                <!-- Profile Section -->
+                <div id="profile" style="display: none;">
+                    <h1>👤 Quản Lý Hồ Sơ</h1>
+                    
+                    <h2>Thông Tin Cập Nhật</h2>
+                    <ul>
+                        <li><strong>Tên Khách Hàng</strong> (Bắt buộc)</li>
+                        <li><strong>Email</strong> (Bắt buộc - không đổi)</li>
+                        <li><strong>Điện Thoại</strong> (Tùy chọn)</li>
+                        <li><strong>Địa Chỉ</strong> (Tùy chọn)</li>
+                    </ul>
+
+                    <h2>Các Nút Hành Động</h2>
+                    <ul>
+                        <li>💾 <strong>Lưu Hồ Sơ</strong> - Lưu thay đổi</li>
+                        <li>🔄 <strong>Tải Lại</strong> - Huỷ thay đổi</li>
+                    </ul>
+                </div>
+
+                <!-- Upload Section -->
+                <div id="upload" style="display: none;">
+                    <h1>📁 Tạo Yêu Cầu Dịch Vụ</h1>
+                    
+                    <h2>Các Bước</h2>
+                    <ol>
+                        <li><strong>Chọn Loại Dịch Vụ</strong> - 🎤 Phiên Âm, 🎼 Phối khí, hoặc 🎙️ Thu Âm</li>
+                        <li><strong>Tải Lên File</strong> - Kéo thả hoặc nhấp để chọn</li>
+                        <li><strong>Thêm Mô Tả</strong> (Tùy chọn) - Hướng dẫn chi tiết</li>
+                        <li><strong>Gửi Yêu Cầu</strong> - Nhấp nút gửi</li>
+                    </ol>
+
+                    <h2>Định Dạng File</h2>
+                    <p><strong>Hỗ trợ:</strong> MP3, WAV, OGG, FLAC, AIFF</p>
+                    <p><strong>Dung lượng tối đa:</strong> 100 MB</p>
+                    <p><strong>Chất lượng tối thiểu:</strong> 128 kbps</p>
+                </div>
+
+                <!-- Tracking Section -->
+                <div id="tracking" style="display: none;">
+                    <h1>📋 Theo Dõi Đơn Hàng</h1>
+                    
+                    <h2>Thông Tin Mỗi Đơn</h2>
+                    <ul>
+                        <li>Loại dịch vụ và ID đơn</li>
+                        <li>Ngày tạo và trạng thái hiện tại</li>
+                        <li>Thanh tiến độ trực quan</li>
+                        <li>Mô tả (nếu có)</li>
+                    </ul>
+
+                    <h2>Trạng Thái Đơn Hàng</h2>
+                    <ul>
+                        <li>⏳ <strong>Chưa Xử Lý</strong> - Vừa gửi, chưa được xử lý</li>
+                        <li>⚙️ <strong>Đang Xử Lý</strong> - Chuyên gia đang làm việc</li>
+                        <li>✅ <strong>Hoàn Thành</strong> - Công việc xong</li>
+                        <li>❌ <strong>Đã Hủy</strong> - Bạn đã hủy yêu cầu</li>
+                    </ul>
+
+                    <h2>Hành Động Có Thể</h2>
+                    <ul>
+                        <li>🔍 <strong>Xem Chi Tiết</strong> - Đầy đủ thông tin đơn</li>
+                        <li>❌ <strong>Hủy Yêu Cầu</strong> - Chỉ khi trạng thái "Chưa Xử Lý"</li>
+                    </ul>
+                </div>
+
+                <!-- Payment Section -->
+                <div id="payment" style="display: none;">
+                    <h1>💰 Thanh Toán & Giao Dịch</h1>
+                    
+                    <h2>Thống Kê Thanh Toán</h2>
+                    <ul>
+                        <li>💳 Số đơn chưa thanh toán</li>
+                        <li>💰 Tổng tiền cần thanh toán</li>
+                    </ul>
+
+                    <h2>Các Bước Thanh Toán</h2>
+                    <ol>
+                        <li>Nhấp <strong>"💳 Thanh Toán Ngay"</strong> trên đơn</li>
+                        <li>Chọn <strong>Phương Thức</strong>:
+                            <ul>
+                                <li>💳 Thẻ Tín Dụng</li>
+                                <li>🏦 Chuyển Khoản Ngân Hàng</li>
+                                <li>💰 Ví Điện Tử</li>
+                            </ul>
+                        </li>
+                        <li>Nhập <strong>Tên Người Thanh Toán</strong> (Tùy chọn)</li>
+                        <li>Nhấp <strong>"✓ Xác Nhận Thanh Toán"</strong></li>
+                    </ol>
+
+                    <h2>Lịch Sử Giao Dịch</h2>
+                    <p>Bảng hiển thị tất cả thanh toán đã thực hiện:</p>
+                    <ul>
+                        <li>Ngày giao dịch</li>
+                        <li>Mã thanh toán</li>
+                        <li>Đơn hàng liên quan</li>
+                        <li>Số tiền</li>
+                        <li>Trạng thái (✅ Đã Thanh Toán)</li>
+                    </ul>
+                </div>
+
+                <!-- Feedback Section -->
+                <div id="feedback" style="display: none;">
+                    <h1>💬 Phản Hồi & Chỉnh Sửa</h1>
+                    
+                    <h2>Khi Nào Gửi Phản Hồi?</h2>
+                    <ul>
+                        <li>✏️ <strong>Yêu Cầu Chỉnh Sửa</strong> - Muốn sửa lại kết quả</li>
+                        <li>🐛 <strong>Báo Lỗi</strong> - Phát hiện vấn đề</li>
+                        <li>💡 <strong>Đề Xuất</strong> - Ý kiến cải thiện</li>
+                    </ul>
+
+                    <h2>Các Bước</h2>
+                    <ol>
+                        <li>Chọn <strong>Đơn Hàng</strong> từ danh sách</li>
+                        <li>Nhập <strong>Nội Dung Phản Hồi</strong> chi tiết</li>
+                        <li>Chọn <strong>Loại Phản Hồi</strong></li>
+                        <li>Nhấp <strong>"📤 Gửi Phản Hồi"</strong></li>
+                    </ol>
+
+                    <h2>Xem Phản Hồi Trước Đó</h2>
+                    <p>Tất cả phản hồi bạn gửi sẽ hiển thị ở phần "Phản Hồi Trước Đó"</p>
+                </div>
+
+                <!-- Troubleshoot Section -->
+                <div id="troubleshoot" style="display: none;">
+                    <h1>🐛 Khắc Phục Sự Cố</h1>
+
+                    <h2>❌ Lỗi: "Email Đã Tồn Tại"</h2>
+                    <div class="alert alert-error">Error: Email already exists</div>
+                    <p><strong>Giải Pháp:</strong></p>
+                    <ul>
+                        <li>Sử dụng email khác</li>
+                    </ul>
+
+                    <h2>❌ Lỗi: "File Tải Lên Không Được Thực Hiện"</h2>
+                    <div class="alert alert-error">Error: File upload failed</div>
+                    <p><strong>Giải Pháp:</strong></p>
+                    <ul>
+                        <li>Kiểm tra định dạng: MP3, WAV, OGG, FLAC</li>
+                        <li>Kiểm tra dung lượng < 100 MB</li>
+                        <li>Thử file khác để test</li>
+                    </ul>
+
+                    <h2>❌ Lỗi: "Thanh Toán Thất Bại"</h2>
+                    <div class="alert alert-error">Error: Payment processing failed</div>
+                    <p><strong>Giải Pháp:</strong></p>
+                    <ul>
+                        <li>Chọn lại phương thức thanh toán</li>
+                        <li>Kiểm tra kết nối internet</li>
+                        <li>Liên hệ hỗ trợ nếu vẫn gặp vấn đề</li>
+                    </ul>
+
+                    <div class="alert alert-info">
+                        <strong>ℹ️ Cần Trợ Giúp?</strong> Liên hệ 2251120398@ut.edu.vn hoặc gọi 1800-100Co'
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('[id*="overview"], [id*="startup"], [id*="login"], [id*="dashboard"], [id*="profile"], [id*="upload"], [id*="tracking"], [id*="payment"], [id*="feedback"], [id*="troubleshoot"]').forEach(el => {
+                if (['overview', 'startup', 'login', 'dashboard', 'profile', 'upload', 'tracking', 'payment', 'feedback', 'troubleshoot'].includes(el.id)) {
+                    el.style.display = 'none';
+                }
+            });
+
+            // Show selected section
+            document.getElementById(sectionId).style.display = 'block';
+
+            // Update active menu item
+            document.querySelectorAll('.menu-item').forEach(el => {
+                el.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Scroll to top
+            document.querySelector('.content').scrollTop = 0;
+        }
+
+        function goToDashboard() {
+            window.location.href = 'customer-dashboard.html';
+        }
+
+        function goToTranscriber() {
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

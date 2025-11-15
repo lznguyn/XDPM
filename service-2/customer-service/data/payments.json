@@ -1,0 +1,12 @@
+[
+  {
+    "id": "e597a4a8-cbc9-480a-a710-a9b85c99b6d6",
+    "customer_id": "b47967a5-04b3-4573-9a27-e5704310bfed",
+    "service_request_id": "ffa27182-791c-47b4-9bfa-0efae8db1d0a",
+    "amount": 50000.0,
+    "payment_method": "wallet",
+    "status": "completed",
+    "payment_date": "2025-11-12T03:08:04.722751",
+    "transaction_id": "06282343-97e9-49a6-b61c-a47bd6bd1ed2"
+  }
+]

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MuTraPro - Đăng Nhập</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-width: 400px;
+            width: 100%;
+            padding: 40px;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .logo p {
+            color: #999;
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #999;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .tab-btn.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .message.success {
+            background: #d3f9d8;
+            color: #2f9e44;
+            border-left: 4px solid #2f9e44;
+        }
+
+        .message.error {
+            background: #ffe0e6;
+            color: #c92a2a;
+            border-left: 4px solid #c92a2a;
+        }
+
+        .message.info {
+            background: #d0ebff;
+            color: #1971c2;
+            border-left: 4px solid #1971c2;
+        }
+
+        .links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .links a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .links a:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+
+        .spinner {
+            border: 3px solid #f0f0f0;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .info-box {
+            background: #f0f1ff;
+            border-left: 4px solid #667eea;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+
+            .logo h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>🎵 MuTraPro</h1>
+            <p>Nền tảng quản lý dịch vụ âm nhạc</p>
+        </div>
+
+        <div id="message"></div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('login')">Đăng Nhập</button>
+            <button class="tab-btn" onclick="switchTab('register')">Đăng Ký</button>
+        </div>
+
+        <!-- Login Tab -->
+        <div id="login" class="tab-content active">
+
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label for="loginEmail">Email *</label>
+                    <input type="email" id="loginEmail" placeholder="Nhập email của bạn" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="loginName">Tên Khách Hàng *</label>
+                    <input type="text" id="loginName" placeholder="Nhập tên của bạn" required>
+                </div>
+
+                <button type="submit" class="btn" id="loginBtn">Đăng Nhập</button>
+            </form>
+        </div>
+
+        <!-- Register Tab -->
+        <div id="register" class="tab-content">
+
+            <form onsubmit="handleSignUp(event)">
+                <div class="form-group">
+                    <label for="signupEmail">Email *</label>
+                    <input type="email" id="signupEmail" placeholder="Nhập email của bạn" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signupName">Tên Khách Hàng *</label>
+                    <input type="text" id="signupName" placeholder="Nhập tên của bạn" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signupPhone">Điện Thoại (Tùy chọn)</label>
+                    <input type="tel" id="signupPhone" placeholder="Số điện thoại">
+                </div>
+
+                <div class="form-group">
+                    <label for="signupAddress">Địa Chỉ (Tùy chọn)</label>
+                    <input type="text" id="signupAddress" placeholder="Địa chỉ của bạn">
+                </div>
+
+                <button type="submit" class="btn" id="signupBtn">Tạo Tài Khoản</button>
+            </form>
+        </div>
+
+        <div class="links">
+            ← <a href="index.html">Quay lại Transcriber</a>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8001';
+
+        function switchTab(tab) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+
+            // Remove active from all buttons
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tab).classList.add('active');
+
+            // Set button active
+            event.target.classList.add('active');
+
+            // Clear messages
+            document.getElementById('message').innerHTML = '';
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('loginEmail').value.trim();
+            const name = document.getElementById('loginName').value.trim();
+            const messageDiv = document.getElementById('message');
+            const btn = document.getElementById('loginBtn');
+
+            if (!email || !name) {
+                showMessage(messageDiv, 'Vui lòng nhập email và tên', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Đang xử lý...';
+
+            try {
+                // Check if customer exists by fetching all customers
+                const listResponse = await fetch(`${API_BASE}/customers`);
+                if (!listResponse.ok) throw new Error('Lỗi kết nối server');
+
+                const customers = await listResponse.json();
+                const customer = customers.find(c => c.email === email);
+
+                if (!customer) {
+                    showMessage(messageDiv, '❌ Tài khoản không tồn tại. Vui lòng tạo tài khoản mới.', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Đăng Nhập';
+                    return;
+                }
+
+                // Store session
+                localStorage.setItem('customerId', customer.id);
+                localStorage.setItem('customerName', customer.name);
+
+                showMessage(messageDiv, '✓ Đăng nhập thành công! Đang chuyển hướng...', 'success');
+
+                setTimeout(() => {
+                    window.location.href = 'customer-dashboard.html';
+                }, 1000);
+
+            } catch (error) {
+                showMessage(messageDiv, '❌ ' + error.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = 'Đăng Nhập';
+            }
+        }
+
+        async function handleSignUp(event) {
+            event.preventDefault();
+
+            const email = document.getElementById('signupEmail').value.trim();
+            const name = document.getElementById('signupName').value.trim();
+            const phone = document.getElementById('signupPhone').value.trim();
+            const address = document.getElementById('signupAddress').value.trim();
+            const messageDiv = document.getElementById('message');
+            const btn = document.getElementById('signupBtn');
+
+            if (!email || !name) {
+                showMessage(messageDiv, 'Vui lòng nhập email và tên', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Đang tạo...';
+
+            try {
+                const formData = new FormData();
+                formData.append('name', name);
+                formData.append('email', email);
+                if (phone) formData.append('phone', phone);
+                if (address) formData.append('address', address);
+
+                const response = await fetch(`${API_BASE}/customers`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.status === 400) {
+                    showMessage(messageDiv, '❌ Email đã tồn tại. Vui lòng sử dụng email khác.', 'error');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Tạo Tài Khoản';
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error('Lỗi tạo tài khoản');
+                }
+
+                const customer = await response.json();
+
+                // Store session
+                localStorage.setItem('customerId', customer.id);
+                localStorage.setItem('customerName', customer.name);
+
+                showMessage(messageDiv, '✓ Tài khoản tạo thành công! Đang chuyển hướng...', 'success');
+
+                setTimeout(() => {
+                    window.location.href = 'customer-dashboard.html';
+                }, 1500);
+
+            } catch (error) {
+                showMessage(messageDiv, '❌ ' + error.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = 'Tạo Tài Khoản';
+            }
+        }
+
+        function showMessage(element, message, type) {
+            element.innerHTML = `<div class="message ${type}">${message}</div>`;
+        }
+
+        // Check if already logged in
+        window.addEventListener('load', () => {
+            const customerId = localStorage.getItem('customerId');
+            if (customerId) {
+                // Already logged in, redirect
+                window.location.href = 'customer-dashboard.html';
+            }
+        });
+    </script>
+</body>
+</html>

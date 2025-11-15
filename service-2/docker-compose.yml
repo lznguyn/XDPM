@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # Single container with all 3 services
+  mutrapro:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mutrapro-full-stack
+    ports:
+      - "8000:8000"  # Backend (Music Processing)
+      - "8001:8001"  # Customer Service
+      - "8080:8080"  # Frontend
+    volumes:
+      - ./backend:/app/backend
+      - ./customer-service:/app/customer-service
+      - ./frontend:/app/frontend
+      - mutrapro-data:/app/customer-service/data
+      - mutrapro-uploads:/app/backend/uploads
+      - mutrapro-outputs:/app/backend/outputs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ALLOWED_ORIGINS=*
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  mutrapro-data:
+    driver: local
+  mutrapro-uploads:
+    driver: local
+  mutrapro-outputs:
+    driver: local

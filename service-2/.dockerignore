@@ -1,0 +1,58 @@
+# Docker Ignore - Tối ưu hóa image size
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Virtual environments
+.venv
+.env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Dependencies
+*.egg-info/
+dist/
+build/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Git
+.git
+.gitignore
+
+# Documentation (optional, keep if needed)
+docs/
+*.md
+
+# Large files
+*.tar.gz
+*.zip
+
+# Node modules (if any frontend build)
+node_modules/
+
+# Temporary files
+*.tmp
+*.log
+temp/
+
+# Keep data during build
+!customer-service/data
+!backend/uploads
+!backend/outputs
