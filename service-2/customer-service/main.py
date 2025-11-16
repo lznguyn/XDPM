@@ -1,9 +1,9 @@
 """
 MuTraPro - Customer Microservice
 Manages customer profiles, service requests, order tracking, and payments
+Now uses auth-service API instead of JSON files
 """
 import os
-import json
 import uuid
 from datetime import datetime
 from typing import List, Optional
@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import uvicorn
+from db_client import db_client
 
 # ============================================================================
 # Enums
@@ -93,29 +94,11 @@ class Transaction(BaseModel):
     date: str
 
 # ============================================================================
-# Database (Simple JSON files - can be replaced with DB later)
+# File Upload Directory
 # ============================================================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-os.makedirs(DATA_DIR, exist_ok=True)
-
-CUSTOMERS_FILE = os.path.join(DATA_DIR, "customers.json")
-REQUESTS_FILE = os.path.join(DATA_DIR, "requests.json")
-PAYMENTS_FILE = os.path.join(DATA_DIR, "payments.json")
-TRANSACTIONS_FILE = os.path.join(DATA_DIR, "transactions.json")
-FEEDBACKS_FILE = os.path.join(DATA_DIR, "feedbacks.json")
-
-def load_json(file_path):
-    """Load JSON file or return empty list"""
-    if os.path.exists(file_path):
-        with open(file_path, 'r') as f:
-            return json.load(f)
-    return []
-
-def save_json(file_path, data):
-    """Save data to JSON file"""
-    with open(file_path, 'w') as f:
-        json.dump(data, f, indent=2)
+UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 # ============================================================================
 # FastAPI Setup
@@ -133,69 +116,85 @@ app.add_middleware(
 # CUSTOMER ENDPOINTS
 # ============================================================================
 @app.post("/customers")
-def create_customer(name: str = Form(...), email: str = Form(...), phone: Optional[str] = Form(None), address: Optional[str] = Form(None)):
+async def create_customer(name: str = Form(...), email: str = Form(...), phone: Optional[str] = Form(None), address: Optional[str] = Form(None)):
     """Create new customer account"""
-    customers = load_json(CUSTOMERS_FILE)
-    
-    # Check if email already exists
-    if any(c["email"] == email for c in customers):
-        raise HTTPException(status_code=400, detail="Email already exists")
-    
-    customer = {
-        "id": str(uuid.uuid4()),
-        "name": name,
-        "email": email,
-        "phone": phone,
-        "address": address,
-        "account_created": datetime.now().isoformat(),
-        "is_active": True
-    }
-    
-    customers.append(customer)
-    save_json(CUSTOMERS_FILE, customers)
-    
-    return customer
+    try:
+        customer = await db_client.create_customer(name, email, phone, address)
+        # Convert to expected format
+        return {
+            "id": str(customer["id"]),
+            "name": customer["name"],
+            "email": customer["email"],
+            "phone": customer.get("phone"),
+            "address": customer.get("address"),
+            "account_created": customer["account_created"],
+            "is_active": customer["is_active"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/customers")
-def list_customers():
+async def list_customers():
     """Get all customers"""
-    return load_json(CUSTOMERS_FILE)
+    try:
+        customers = await db_client.get_all_customers()
+        # Convert to expected format
+        return [{
+            "id": str(c["id"]),
+            "name": c["name"],
+            "email": c["email"],
+            "phone": c.get("phone"),
+            "address": c.get("address"),
+            "account_created": c["account_created"],
+            "is_active": c["is_active"]
+        } for c in customers]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/customers/{customer_id}")
-def get_customer(customer_id: str):
+async def get_customer(customer_id: str):
     """Get customer profile by ID"""
-    customers = load_json(CUSTOMERS_FILE)
-    customer = next((c for c in customers if c["id"] == customer_id), None)
-    
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    
-    return customer
+    try:
+        customer = await db_client.get_customer(int(customer_id))
+        if not customer:
+            raise HTTPException(status_code=404, detail="Customer not found")
+        
+        return {
+            "id": str(customer["id"]),
+            "name": customer["name"],
+            "email": customer["email"],
+            "phone": customer.get("phone"),
+            "address": customer.get("address"),
+            "account_created": customer["account_created"],
+            "is_active": customer["is_active"]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/customers/{customer_id}")
-def update_customer(customer_id: str, name: Optional[str] = Form(None), phone: Optional[str] = Form(None), address: Optional[str] = Form(None)):
+async def update_customer(customer_id: str, name: Optional[str] = Form(None), phone: Optional[str] = Form(None), address: Optional[str] = Form(None)):
     """Update customer profile"""
-    customers = load_json(CUSTOMERS_FILE)
-    customer = next((c for c in customers if c["id"] == customer_id), None)
-    
-    if not customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-    
-    if name:
-        customer["name"] = name
-    if phone:
-        customer["phone"] = phone
-    if address:
-        customer["address"] = address
-    
-    save_json(CUSTOMERS_FILE, customers)
-    return customer
+    try:
+        customer = await db_client.update_customer(int(customer_id), name, phone, address)
+        return {
+            "id": str(customer["id"]),
+            "name": customer["name"],
+            "email": customer["email"],
+            "phone": customer.get("phone"),
+            "address": customer.get("address"),
+            "account_created": customer["account_created"],
+            "is_active": customer["is_active"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 # ============================================================================
 # SERVICE REQUEST ENDPOINTS
 # ============================================================================
 @app.post("/requests")
-def create_service_request(
+async def create_service_request(
     customer_id: str = Form(...),
     service_type: ServiceType = Form(...),
     title: str = Form(...),
@@ -204,199 +203,221 @@ def create_service_request(
     file: Optional[UploadFile] = File(None)
 ):
     """Submit new service request (transcription, arrangement, recording)"""
-    # Verify customer exists
-    customers = load_json(CUSTOMERS_FILE)
-    if not any(c["id"] == customer_id for c in customers):
-        raise HTTPException(status_code=404, detail="Customer not found")
-    
-    request_id = str(uuid.uuid4())
-    file_name = None
-    
-    # Save uploaded file if provided
-    if file:
-        file_name = f"{request_id}_{file.filename}"
-        uploads_dir = os.path.join(BASE_DIR, "uploads")
-        os.makedirs(uploads_dir, exist_ok=True)
+    try:
+        # Verify customer exists
+        customer = await db_client.get_customer(int(customer_id))
+        if not customer:
+            raise HTTPException(status_code=404, detail="Customer not found")
         
-        with open(os.path.join(uploads_dir, file_name), 'wb') as f:
-            f.write(file.file.read())
-    
-    service_request = {
-        "id": request_id,
-        "customer_id": customer_id,
-        "service_type": service_type.value,
-        "title": title,
-        "description": description,
-        "file_name": file_name,
-        "status": RequestStatus.SUBMITTED.value,
-        "created_date": datetime.now().isoformat(),
-        "due_date": due_date,
-        "assigned_specialist": None,
-        "priority": "normal",
-        "paid": False
-    }
-    
-    requests = load_json(REQUESTS_FILE)
-    requests.append(service_request)
-    save_json(REQUESTS_FILE, requests)
-    
-    return service_request
+        file_name = None
+        
+        # Save uploaded file if provided
+        if file:
+            file_name = f"{uuid.uuid4()}_{file.filename}"
+            file_path = os.path.join(UPLOADS_DIR, file_name)
+            with open(file_path, 'wb') as f:
+                content = await file.read()
+                f.write(content)
+        
+        # Parse due_date if provided
+        due_date_parsed = None
+        if due_date:
+            try:
+                due_date_parsed = datetime.fromisoformat(due_date.replace('Z', '+00:00'))
+            except:
+                pass
+        
+        # Create service request via API
+        request = await db_client.create_service_request(
+            customer_id=int(customer_id),
+            service_type=service_type.value,
+            title=title,
+            description=description,
+            file_name=file_name,
+            due_date=due_date_parsed.isoformat() if due_date_parsed else None,
+            priority="normal"
+        )
+        
+        return {
+            "id": str(request["id"]),
+            "customer_id": str(request["customer_id"]),
+            "service_type": request["service_type"],
+            "title": request["title"],
+            "description": request.get("description"),
+            "file_name": request.get("file_name"),
+            "status": request["status"],
+            "created_date": request["created_date"],
+            "due_date": request.get("due_date"),
+            "assigned_specialist": str(request.get("assigned_specialist_id")) if request.get("assigned_specialist_id") else None,
+            "priority": request.get("priority", "normal"),
+            "paid": request.get("paid", False)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/requests/customer/{customer_id}")
-def get_customer_requests(customer_id: str):
+async def get_customer_requests(customer_id: str):
     """Get all service requests for a customer"""
-    requests = load_json(REQUESTS_FILE)
-    customer_requests = [r for r in requests if r["customer_id"] == customer_id]
-    
-    if not customer_requests:
-        raise HTTPException(status_code=404, detail="No requests found")
-    
-    return customer_requests
+    try:
+        requests = await db_client.get_customer_requests(int(customer_id))
+        if not requests:
+            raise HTTPException(status_code=404, detail="No requests found")
+        
+        return [{
+            "id": str(r["id"]),
+            "customer_id": str(r["customer_id"]),
+            "service_type": r["service_type"],
+            "title": r["title"],
+            "description": r.get("description"),
+            "file_name": r.get("file_name"),
+            "status": r["status"],
+            "created_date": r["created_date"],
+            "due_date": r.get("due_date"),
+            "assigned_specialist": str(r.get("assigned_specialist_id")) if r.get("assigned_specialist_id") else None,
+            "priority": r.get("priority", "normal"),
+            "paid": r.get("paid", False)
+        } for r in requests]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/requests/{request_id}")
-def get_request_details(request_id: str):
+async def get_request_details(request_id: str):
     """Get service request details"""
-    requests = load_json(REQUESTS_FILE)
-    request = next((r for r in requests if r["id"] == request_id), None)
-    
-    if not request:
-        raise HTTPException(status_code=404, detail="Request not found")
-    
-    return request
+    try:
+        request = await db_client.get_service_request(int(request_id))
+        if not request:
+            raise HTTPException(status_code=404, detail="Request not found")
+        
+        return {
+            "id": str(request["id"]),
+            "customer_id": str(request["customer_id"]),
+            "service_type": request["service_type"],
+            "title": request["title"],
+            "description": request.get("description"),
+            "file_name": request.get("file_name"),
+            "status": request["status"],
+            "created_date": request["created_date"],
+            "due_date": request.get("due_date"),
+            "assigned_specialist": str(request.get("assigned_specialist_id")) if request.get("assigned_specialist_id") else None,
+            "priority": request.get("priority", "normal"),
+            "paid": request.get("paid", False)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.put("/requests/{request_id}/status")
-def update_request_status(request_id: str, status: RequestStatus = Form(...)):
+async def update_request_status(request_id: str, status: RequestStatus = Form(...)):
     """Update service request status"""
-    requests = load_json(REQUESTS_FILE)
-    request = next((r for r in requests if r["id"] == request_id), None)
-    
-    if not request:
-        raise HTTPException(status_code=404, detail="Request not found")
-    
-    request["status"] = status.value
-    save_json(REQUESTS_FILE, requests)
-    
-    return request
+    try:
+        # Convert enum to string
+        status_str = status.value
+        # Map to database enum values
+        status_map = {
+            "submitted": "Submitted",
+            "assigned": "Assigned",
+            "in_progress": "InProgress",
+            "pending_review": "PendingReview",
+            "completed": "Completed",
+            "revision_requested": "RevisionRequested",
+            "cancelled": "Cancelled"
+        }
+        db_status = status_map.get(status_str, status_str.capitalize())
+        
+        request = await db_client.update_request_status(int(request_id), db_status)
+        return {
+            "id": str(request["id"]),
+            "status": request["status"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 # ============================================================================
 # FEEDBACK & REVISION ENDPOINTS
 # ============================================================================
 @app.post("/feedback")
-def submit_feedback(
+async def submit_feedback(
     request_id: str = Form(...),
     content: str = Form(...),
     feedback_type: str = Form("revision")
 ):
     """Submit feedback or request revision"""
-    requests_data = load_json(REQUESTS_FILE)
-    if not any(r["id"] == request_id for r in requests_data):
-        raise HTTPException(status_code=404, detail="Request not found")
-    
-    feedback = {
-        "id": str(uuid.uuid4()),
-        "request_id": request_id,
-        "content": content,
-        "feedback_type": feedback_type,
-        "created_date": datetime.now().isoformat()
-    }
-    
-    # If revision requested, update request status
-    if feedback_type == "revision":
-        request = next(r for r in requests_data if r["id"] == request_id)
-        request["status"] = RequestStatus.REVISION_REQUESTED.value
-        save_json(REQUESTS_FILE, requests_data)
-    
-    # Save feedback to file
-    feedbacks = load_json(FEEDBACKS_FILE)
-    feedbacks.append(feedback)
-    save_json(FEEDBACKS_FILE, feedbacks)
-    
-    return feedback
-
-@app.get("/feedback/request/{request_id}")
-def get_feedback_by_request(request_id: str):
-    """Get all feedback for a specific request"""
-    feedbacks = load_json(FEEDBACKS_FILE)
-    request_feedbacks = [f for f in feedbacks if f["request_id"] == request_id]
-    return request_feedbacks
-
-@app.get("/feedback/customer/{customer_id}")
-def get_feedback_by_customer(customer_id: str):
-    """Get all feedback for a customer's requests"""
-    requests_data = load_json(REQUESTS_FILE)
-    customer_request_ids = [r["id"] for r in requests_data if r["customer_id"] == customer_id]
-    
-    feedbacks = load_json(FEEDBACKS_FILE)
-    customer_feedbacks = [f for f in feedbacks if f["request_id"] in customer_request_ids]
-    return customer_feedbacks
+    try:
+        revision_needed = (feedback_type == "revision")
+        feedback = await db_client.create_feedback(
+            request_id=int(request_id),
+            feedback_text=content,
+            revision_needed=revision_needed
+        )
+        
+        return {
+            "id": str(feedback["id"]),
+            "request_id": str(feedback["request_id"]),
+            "feedback_text": feedback["feedback_text"],
+            "revision_needed": feedback["revision_needed"],
+            "created_date": feedback["created_date"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 # ============================================================================
 # PAYMENT & TRANSACTION ENDPOINTS
 # ============================================================================
 @app.post("/payments")
-def create_payment(
+async def create_payment(
     customer_id: str = Form(...),
     service_request_id: str = Form(...),
     amount: float = Form(...),
     payment_method: str = Form(...)
 ):
     """Process payment"""
-    # Verify customer exists
-    customers = load_json(CUSTOMERS_FILE)
-    if not any(c["id"] == customer_id for c in customers):
-        raise HTTPException(status_code=404, detail="Customer not found")
-    
-    payment = {
-        "id": str(uuid.uuid4()),
-        "customer_id": customer_id,
-        "service_request_id": service_request_id,
-        "amount": amount,
-        "payment_method": payment_method,
-        "status": PaymentStatus.COMPLETED.value,
-        "payment_date": datetime.now().isoformat(),
-        "transaction_id": str(uuid.uuid4())
-    }
-    
-    payments = load_json(PAYMENTS_FILE)
-    payments.append(payment)
-    save_json(PAYMENTS_FILE, payments)
-    
-    # Mark request as paid
-    requests_data = load_json(REQUESTS_FILE)
-    request_obj = next((r for r in requests_data if r["id"] == service_request_id), None)
-    if request_obj:
-        request_obj["paid"] = True
-        save_json(REQUESTS_FILE, requests_data)
-    
-    # Record transaction
-    transaction = {
-        "id": str(uuid.uuid4()),
-        "customer_id": customer_id,
-        "description": f"Payment for {service_request_id}",
-        "amount": amount,
-        "transaction_type": "payment",
-        "date": datetime.now().isoformat(),
-        "payment_id": payment["id"],
-        "request_id": service_request_id,
-        "status": "completed"
-    }
-    
-    transactions = load_json(TRANSACTIONS_FILE)
-    transactions.append(transaction)
-    save_json(TRANSACTIONS_FILE, transactions)
-    
-    return payment
+    try:
+        payment = await db_client.create_payment(
+            customer_id=int(customer_id),
+            service_request_id=int(service_request_id),
+            amount=amount,
+            payment_method=payment_method
+        )
+        
+        return {
+            "id": str(payment["id"]),
+            "customer_id": str(payment["customer_id"]),
+            "service_request_id": str(payment["service_request_id"]),
+            "amount": float(payment["amount"]),
+            "payment_method": payment["payment_method"],
+            "status": payment["payment_status"],
+            "payment_date": payment["payment_date"],
+            "transaction_id": payment.get("transaction_id")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 @app.get("/transactions/{customer_id}")
-def get_customer_transactions(customer_id: str):
+async def get_customer_transactions(customer_id: str):
     """Get transaction history for customer"""
-    transactions = load_json(TRANSACTIONS_FILE)
-    customer_transactions = [t for t in transactions if t["customer_id"] == customer_id]
-    
-    if not customer_transactions:
-        raise HTTPException(status_code=404, detail="No transactions found")
-    
-    return customer_transactions
+    try:
+        transactions = await db_client.get_customer_transactions(int(customer_id))
+        if not transactions:
+            raise HTTPException(status_code=404, detail="No transactions found")
+        
+        return [{
+            "id": str(t["id"]),
+            "customer_id": str(t["customer_id"]),
+            "description": t["description"],
+            "amount": float(t["amount"]),
+            "transaction_type": t["transaction_type"],
+            "date": t["date"],
+            "payment_id": str(t["payment_id"]) if t.get("payment_id") else None
+        } for t in transactions]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ============================================================================
 # HEALTH & STATUS ENDPOINTS

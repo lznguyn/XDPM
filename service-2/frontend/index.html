@@ -97,7 +97,7 @@
   - Override via API_BASE_OVERRIDE if needed
 */
 const API_BASE = (typeof API_BASE_OVERRIDE !== 'undefined') ? API_BASE_OVERRIDE : 'http://localhost:8000';
-const CUSTOMER_API_BASE = (typeof CUSTOMER_API_OVERRIDE !== 'undefined') ? CUSTOMER_API_OVERRIDE : 'http://localhost:8001';
+const CUSTOMER_API_BASE = (typeof CUSTOMER_API_OVERRIDE !== 'undefined') ? CUSTOMER_API_OVERRIDE : 'http://localhost:8000';
 const API = API_BASE + '/api/v1/trans';
 document.getElementById('apiUrl').innerText = API;
 

@@ -56,6 +56,12 @@
       ],
       "request": {
         "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\n\t\"name\": \"Add your name in the body\"\n}",
@@ -66,13 +72,14 @@
           }
         },
         "url": {
-          "raw": "http://localhost:8000/auth/register",
+          "raw": "http://localhost:8000/api/auth/register",
           "protocol": "http",
           "host": [
             "localhost"
           ],
           "port": "8000",
           "path": [
+            "api",
             "auth",
             "register"
           ]

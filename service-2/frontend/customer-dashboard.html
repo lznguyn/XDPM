@@ -766,8 +766,28 @@
     </div>
 
     <script>
-        // Configuration
-        const API_BASE = 'http://localhost:8001';
+        // Configuration - Use Kong Gateway
+        const API_BASE = 'http://localhost:8000';
+        
+        // Get URL parameters (from service-1 login redirect)
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlCustomerId = urlParams.get('customerId');
+        const urlToken = urlParams.get('token');
+        const urlName = urlParams.get('name');
+        
+        // Save URL parameters to localStorage if provided (from service-1 login)
+        if (urlCustomerId) {
+            localStorage.setItem('customerId', urlCustomerId);
+            if (urlName) {
+                localStorage.setItem('customerName', urlName);
+            }
+            if (urlToken) {
+                localStorage.setItem('token', urlToken);
+            }
+            // Clean URL by removing parameters
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+        
         let currentCustomerId = localStorage.getItem('customerId');
         let currentCustomerName = localStorage.getItem('customerName');
 
@@ -791,6 +811,7 @@
         function logout() {
             localStorage.removeItem('customerId');
             localStorage.removeItem('customerName');
+            localStorage.removeItem('token');
             window.location.href = 'auth.html';
         }
 

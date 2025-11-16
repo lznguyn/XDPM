@@ -42,6 +42,8 @@ namespace MuTraProAPI.Controllers
             });
         }
         [HttpPost("upload")]
+        [Consumes("multipart/form-data")]
+        [ApiExplorerSettings(IgnoreApi = true)] // Exclude from Swagger to avoid IFormFile generation error
         public async Task<IActionResult> UploadMix([FromForm] int requestId, [FromForm] IFormFile mixFile)
         {
             if (mixFile == null || mixFile.Length == 0)

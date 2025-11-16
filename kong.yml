@@ -2,24 +2,82 @@ _format_version: "3.0"
 _transform: true
 
 services:
-  # ==========================
-  # AUTH SERVICE (.NET 8081)
-  # ==========================
+  # ================== AUTH SERVICE ==================
   - name: auth-service
-    url: http://auth-service:8081/api/Auth
+    url: http://auth-service:8081
     routes:
       - name: auth-route
         paths:
-          - /auth
-        strip_path: true
+          - /api/Auth
+          - /api/Admin
+          - /api/Customer
+          - /api/Studio
+          - /api/Arrangement
+        strip_path: false
+        preserve_host: true
 
-  # ==========================
-  # CUSTOMER SERVICE (FastAPI 8001)
-  # ==========================
+  # ================== COORDINATOR SERVICE ==================
+  - name: coordinator-service
+    url: http://coordinator-service:3000
+    routes:
+      - name: coordinator-route
+        paths:
+          - /api/coordinator
+        strip_path: false
+        preserve_host: true
+
+  # ================== PAYMENT SERVICE ==================
+  - name: payment-service
+    url: http://payment-service:3001
+    routes:
+      - name: payment-route
+        paths:
+          - /api/payments
+        strip_path: false
+        preserve_host: true
+
+  # ================== BACKEND SERVICE (TRANSCRIPTASE) ==================
+  - name: backend-service
+    url: http://backend:8000
+    routes:
+      - name: backend-route
+        paths:
+          - /api/v1
+        strip_path: false
+        preserve_host: true
+
+  # ================== CUSTOMER SERVICE ==================
   - name: customer-service
-    url: http://customer-service:8001
+    url: http://backend:8001
     routes:
       - name: customer-route
         paths:
-          - /customer
-        strip_path: true
+          - /api/customer
+        strip_path: false
+        preserve_host: true
+
+# ==================== GLOBAL CORS ====================
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - PATCH
+        - OPTIONS
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-Type
+        - Authorization
+        - X-CSRF-Token
+      exposed_headers:
+        - X-Pagination-Total-Count
+        - X-Pagination-Page-Count
+      credentials: true
+      max_age: 3600

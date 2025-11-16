@@ -9,7 +9,10 @@ if(isset($_POST['submit'])){
     $user_type = $_POST['role'] ?? '';
     $admin_code = $_POST['admin_code'] ?? '';
 
-    if ($pass !== $cpass) {
+    // Validation: Email phải là định dạng email hợp lệ
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $messages[] = 'Vui lòng nhập địa chỉ email hợp lệ!';
+    } elseif ($pass !== $cpass) {
         $messages[] = 'Mật khẩu xác nhận không trùng khớp!';
     } elseif (strlen($pass) < 8) {
         $messages[] = 'Mật khẩu phải có ít nhất 8 ký tự!';
@@ -17,7 +20,13 @@ if(isset($_POST['submit'])){
         $messages[] = 'Mã xác nhận Admin không đúng!';
     } else {
         // 🔹 Gọi API backend .NET
-        $api_url = "http://localhost:5200/api/Auth/register";
+        // Gọi API .NET qua Kong Gateway (hoặc trực tiếp auth-service)
+        // Option 1: Qua Kong Gateway (khuyến nghị)
+        $api_url = "http://localhost:8000/api/Auth/register";
+        // Option 2: Trực tiếp auth-service (nếu chạy Docker)
+        // $api_url = "http://localhost:8081/api/Auth/register";
+        // Option 3: Local .NET service (nếu chạy local)
+        // $api_url = "http://localhost:5200/api/Auth/register";
         $roleMap = [
             'admin' => 0,
             'user' => 1,

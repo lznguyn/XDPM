@@ -265,8 +265,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="loginName">Tên Khách Hàng *</label>
-                    <input type="text" id="loginName" placeholder="Nhập tên của bạn" required>
+                    <label for="loginPassword">Mật khẩu *</label>
+                    <input type="password" id="loginPassword" placeholder="Nhập mật khẩu của bạn" required minlength="8">
                 </div>
 
                 <button type="submit" class="btn" id="loginBtn">Đăng Nhập</button>
@@ -285,6 +285,16 @@
                 <div class="form-group">
                     <label for="signupName">Tên Khách Hàng *</label>
                     <input type="text" id="signupName" placeholder="Nhập tên của bạn" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="signupPassword">Mật khẩu *</label>
+                    <input type="password" id="signupPassword" placeholder="Tối thiểu 8 ký tự" required minlength="8">
+                </div>
+
+                <div class="form-group">
+                    <label for="signupConfirmPassword">Xác nhận mật khẩu *</label>
+                    <input type="password" id="signupConfirmPassword" placeholder="Nhập lại mật khẩu" required minlength="8">
                 </div>
 
                 <div class="form-group">
@@ -307,7 +317,8 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8001';
+        // Use Kong Gateway instead of direct service connection
+        const API_BASE = 'http://localhost:8000';
 
         function switchTab(tab) {
             // Hide all tabs
@@ -334,12 +345,17 @@
             event.preventDefault();
 
             const email = document.getElementById('loginEmail').value.trim();
-            const name = document.getElementById('loginName').value.trim();
+            const password = document.getElementById('loginPassword').value;
             const messageDiv = document.getElementById('message');
             const btn = document.getElementById('loginBtn');
 
-            if (!email || !name) {
-                showMessage(messageDiv, 'Vui lòng nhập email và tên', 'error');
+            if (!email || !password) {
+                showMessage(messageDiv, 'Vui lòng nhập email và mật khẩu', 'error');
+                return;
+            }
+
+            if (password.length < 8) {
+                showMessage(messageDiv, 'Mật khẩu phải có ít nhất 8 ký tự', 'error');
                 return;
             }
 
@@ -347,23 +363,55 @@
             btn.innerHTML = '<span class="spinner"></span> Đang xử lý...';
 
             try {
-                // Check if customer exists by fetching all customers
-                const listResponse = await fetch(`${API_BASE}/customers`);
-                if (!listResponse.ok) throw new Error('Lỗi kết nối server');
+                // Gọi API đăng nhập từ auth-service
+                const response = await fetch(`${API_BASE}/api/Auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: email,
+                        password: password
+                    })
+                });
 
-                const customers = await listResponse.json();
-                const customer = customers.find(c => c.email === email);
-
-                if (!customer) {
-                    showMessage(messageDiv, '❌ Tài khoản không tồn tại. Vui lòng tạo tài khoản mới.', 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = 'Đăng Nhập';
-                    return;
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Lỗi đăng nhập' }));
+                    throw new Error(errorData.message || 'Thông tin đăng nhập không đúng');
                 }
 
-                // Store session
-                localStorage.setItem('customerId', customer.id);
-                localStorage.setItem('customerName', customer.name);
+                const data = await response.json();
+
+                // Lưu token và thông tin user
+                if (data.token) {
+                    localStorage.setItem('authToken', data.token);
+                }
+                if (data.user) {
+                    localStorage.setItem('userId', data.user.id);
+                    localStorage.setItem('userName', data.user.name);
+                    localStorage.setItem('userEmail', data.user.email);
+                    localStorage.setItem('userRole', data.user.role);
+                }
+                
+                // Lưu customerId nếu có
+                if (data.customerId) {
+                    localStorage.setItem('customerId', data.customerId.toString());
+                } else if (data.user && data.user.role === 'User') {
+                    // Nếu là User nhưng chưa có customerId, tìm customer theo userId
+                    try {
+                        const customerResponse = await fetch(`${API_BASE}/api/Customer`);
+                        if (customerResponse.ok) {
+                            const customers = await customerResponse.json();
+                            const customer = customers.find(c => c.email === email);
+                            if (customer) {
+                                localStorage.setItem('customerId', customer.id.toString());
+                                localStorage.setItem('customerName', customer.name);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Could not fetch customer info:', e);
+                    }
+                }
 
                 showMessage(messageDiv, '✓ Đăng nhập thành công! Đang chuyển hướng...', 'success');
 
@@ -383,13 +431,25 @@
 
             const email = document.getElementById('signupEmail').value.trim();
             const name = document.getElementById('signupName').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            const confirmPassword = document.getElementById('signupConfirmPassword').value;
             const phone = document.getElementById('signupPhone').value.trim();
             const address = document.getElementById('signupAddress').value.trim();
             const messageDiv = document.getElementById('message');
             const btn = document.getElementById('signupBtn');
 
-            if (!email || !name) {
-                showMessage(messageDiv, 'Vui lòng nhập email và tên', 'error');
+            if (!email || !name || !password || !confirmPassword) {
+                showMessage(messageDiv, 'Vui lòng điền đầy đủ thông tin bắt buộc', 'error');
+                return;
+            }
+
+            if (password.length < 8) {
+                showMessage(messageDiv, 'Mật khẩu phải có ít nhất 8 ký tự', 'error');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showMessage(messageDiv, 'Mật khẩu xác nhận không khớp', 'error');
                 return;
             }
 
@@ -397,33 +457,60 @@
             btn.innerHTML = '<span class="spinner"></span> Đang tạo...';
 
             try {
-                const formData = new FormData();
-                formData.append('name', name);
-                formData.append('email', email);
-                if (phone) formData.append('phone', phone);
-                if (address) formData.append('address', address);
-
-                const response = await fetch(`${API_BASE}/customers`, {
+                // Gọi API đăng ký từ auth-service
+                const registerResponse = await fetch(`${API_BASE}/api/Auth/register`, {
                     method: 'POST',
-                    body: formData
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        email: email,
+                        password: password,
+                        confirmPassword: confirmPassword,
+                        role: 1 // User role
+                    })
                 });
 
-                if (response.status === 400) {
-                    showMessage(messageDiv, '❌ Email đã tồn tại. Vui lòng sử dụng email khác.', 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = 'Tạo Tài Khoản';
-                    return;
+                if (!registerResponse.ok) {
+                    const errorData = await registerResponse.json().catch(() => ({ message: 'Lỗi đăng ký' }));
+                    throw new Error(errorData.message || 'Lỗi tạo tài khoản');
                 }
 
-                if (!response.ok) {
-                    throw new Error('Lỗi tạo tài khoản');
+                const registerData = await registerResponse.json();
+
+                // Lưu thông tin user
+                if (registerData.user) {
+                    localStorage.setItem('userId', registerData.user.id);
+                    localStorage.setItem('userName', registerData.user.name);
+                    localStorage.setItem('userEmail', registerData.user.email);
+                    localStorage.setItem('userRole', registerData.user.role);
                 }
 
-                const customer = await response.json();
+                // Lưu customerId nếu có
+                if (registerData.customerId) {
+                    localStorage.setItem('customerId', registerData.customerId.toString());
+                    localStorage.setItem('customerName', name);
+                }
 
-                // Store session
-                localStorage.setItem('customerId', customer.id);
-                localStorage.setItem('customerName', customer.name);
+                // Cập nhật thông tin bổ sung (phone, address) nếu có
+                if ((phone || address) && registerData.customerId) {
+                    try {
+                        const updateData = {};
+                        if (phone) updateData.phone = phone;
+                        if (address) updateData.address = address;
+
+                        await fetch(`${API_BASE}/api/Customer/${registerData.customerId}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(updateData)
+                        });
+                    } catch (e) {
+                        console.warn('Could not update customer details:', e);
+                    }
+                }
 
                 showMessage(messageDiv, '✓ Tài khoản tạo thành công! Đang chuyển hướng...', 'success');
 

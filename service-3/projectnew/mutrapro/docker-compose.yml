@@ -1,58 +1,70 @@
 services:
-  coordinator-db:
+  # Shared PostgreSQL for coordinator and payment services
+  postgres-db:
     image: postgres:16
-    container_name: mutrapro-coordinator-db
+    container_name: mutrapro-postgres-db
     environment:
-      POSTGRES_DB: mutrapro_coordinator
+      POSTGRES_DB: mutrapro_db
       POSTGRES_USER: mutrapro
       POSTGRES_PASSWORD: mutrapro_pw
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
-      - coordinator-db-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mutrapro"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - mutrapro-network
 
   coordinator-service:
     build: ./coordinator-service
     container_name: mutrapro-coordinator-service
     environment:
-      DB_HOST: coordinator-db
+      DB_HOST: postgres-db
       DB_PORT: 5432
       DB_USER: mutrapro
       DB_PASS: mutrapro_pw
-      DB_NAME: mutrapro_coordinator
+      DB_NAME: mutrapro_db
       PORT: 3000
+      NODE_ENV: development
+      AUTH_SERVICE_URL: http://auth-service:8081
+      PAYMENT_SERVICE_URL: http://payment-service:3001
     depends_on:
-      - coordinator-db
+      postgres-db:
+        condition: service_healthy
     ports:
-      - "8081:3000"
-
-  payment-db:
-    image: postgres:16
-    container_name: mutrapro-payment-db
-    environment:
-      POSTGRES_DB: mutrapro_payment
-      POSTGRES_USER: mutrapro
-      POSTGRES_PASSWORD: mutrapro_pw
-    ports:
-      - "5434:5432"
-    volumes:
-      - payment-db-data:/var/lib/postgresql/data
+      - "3000:3000"
+    networks:
+      - mutrapro-network
 
   payment-service:
     build: ./payment-service
     container_name: mutrapro-payment-service
     environment:
-      DB_HOST: payment-db
+      DB_HOST: postgres-db
       DB_PORT: 5432
       DB_USER: mutrapro
       DB_PASS: mutrapro_pw
-      DB_NAME: mutrapro_payment
-      PORT: 3000
+      DB_NAME: mutrapro_db
+      PORT: 3001
+      NODE_ENV: development
+      COORDINATOR_SERVICE_URL: http://coordinator-service:3000
+      CUSTOMER_SERVICE_URL: http://customer-service:8001
     depends_on:
-      - payment-db
+      postgres-db:
+        condition: service_healthy
     ports:
-      - "8082:3000"
+      - "3001:3001"
+    networks:
+      - mutrapro-network
 
 volumes:
-  coordinator-db-data:
-  payment-db-data:
+  postgres-data:
+
+networks:
+  mutrapro-network:
+    driver: bridge

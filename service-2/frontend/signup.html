@@ -272,7 +272,8 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8001';
+        // Use Kong Gateway instead of direct service connection
+        const API_BASE = 'http://localhost:8000';
 
         async function handleSignUp(event) {
             event.preventDefault();

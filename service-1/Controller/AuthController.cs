@@ -29,9 +29,37 @@ namespace MuTraProAPI.Controllers
         }
 
         // Registration and login methods would go here
+        [HttpGet("register")]
+        public IActionResult RegisterInfo()
+        {
+            return Ok(new { 
+                message = "Đây là endpoint đăng ký. Vui lòng sử dụng POST method.",
+                endpoint = "/api/Auth/register",
+                method = "POST",
+                requiredFields = new { 
+                    name = "string",
+                    email = "string (email format)", 
+                    password = "string (min 8 characters)",
+                    confirmPassword = "string (must match password)",
+                    role = "enum (Admin, User, Coordinator, etc.)"
+                },
+                example = new {
+                    name = "Nguyễn Văn A",
+                    email = "user@example.com",
+                    password = "password123",
+                    confirmPassword = "password123",
+                    role = "User"
+                }
+            });
+        }
+
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] UserRegisterDto dto)
         {
+            // Validation: Email phải là định dạng email hợp lệ
+            if(string.IsNullOrWhiteSpace(dto.Email) || !System.Text.RegularExpressions.Regex.IsMatch(dto.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+                return BadRequest(new { message = "Vui lòng nhập địa chỉ email hợp lệ!" });
+
             if(await _context.Users.AnyAsync(u => u.Email == dto.Email))
                 return BadRequest(new { message = "Email đã tồn tại!" });
 
@@ -56,16 +84,110 @@ namespace MuTraProAPI.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Đăng ký thành công!" });
+            // Tự động tạo Customer record nếu role là User
+            if (dto.Role == UserRole.User)
+            {
+                // Kiểm tra xem Customer đã tồn tại chưa (theo email)
+                var existingCustomer = await _context.Customers.FirstOrDefaultAsync(c => c.Email == user.Email);
+                
+                if (existingCustomer != null)
+                {
+                    // Nếu Customer đã tồn tại, chỉ cập nhật UserId
+                    existingCustomer.UserId = user.Id;
+                    existingCustomer.Name = user.Name; // Cập nhật tên nếu có thay đổi
+                    existingCustomer.IsActive = true;
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new { 
+                        message = "Đăng ký thành công!",
+                        userId = user.Id,
+                        customerId = existingCustomer.Id,
+                        user = new {
+                            user.Id,
+                            user.Name,
+                            user.Email,
+                            Role = user.Role.ToString()
+                        }
+                    });
+                }
+                else
+                {
+                    // Tạo Customer mới
+                    var customer = new Customer
+                    {
+                        Name = user.Name,
+                        Email = user.Email,
+                        UserId = user.Id,
+                        AccountCreated = DateTime.Now,
+                        IsActive = true
+                    };
+
+                    _context.Customers.Add(customer);
+                    await _context.SaveChangesAsync();
+
+                    return Ok(new { 
+                        message = "Đăng ký thành công!",
+                        userId = user.Id,
+                        customerId = customer.Id,
+                        user = new {
+                            user.Id,
+                            user.Name,
+                            user.Email,
+                            Role = user.Role.ToString()
+                        }
+                    });
+                }
+            }
+
+            return Ok(new { 
+                message = "Đăng ký thành công!",
+                userId = user.Id,
+                user = new {
+                    user.Id,
+                    user.Name,
+                    user.Email,
+                    Role = user.Role.ToString()
+                }
+            });
         }
+        [HttpGet("login")]
+        public IActionResult LoginInfo()
+        {
+            return Ok(new { 
+                message = "Đây là endpoint đăng nhập. Vui lòng sử dụng POST method.",
+                endpoint = "/api/Auth/login",
+                method = "POST",
+                requiredFields = new { email = "string (email format)", password = "string (min 8 characters)" },
+                example = new {
+                    email = "user@example.com",
+                    password = "password123"
+                }
+            });
+        }
+
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] UserLoginDto dto)
         {
+            // Validation: Email phải là định dạng email hợp lệ
+            if(string.IsNullOrWhiteSpace(dto.Email) || !System.Text.RegularExpressions.Regex.IsMatch(dto.Email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$"))
+                return BadRequest(new { message = "Vui lòng nhập địa chỉ email hợp lệ!" });
+
+            // Validation: Mật khẩu phải có ít nhất 8 ký tự
+            if(string.IsNullOrWhiteSpace(dto.Password) || dto.Password.Length < 8)
+                return BadRequest(new { message = "Mật khẩu phải có ít nhất 8 ký tự!" });
+
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
             if(user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
                 return Unauthorized(new { message = "Thông tin tài khoản hoặc mật khẩu không đúng!" });
 
             var token = GenerateJwtToken(user);
+
+            // Tìm Customer record nếu role là User
+            Customer? customer = null;
+            if (user.Role == UserRole.User)
+            {
+                customer = await _context.Customers.FirstOrDefaultAsync(c => c.UserId == user.Id);
+            }
 
             return Ok(new {
                 token,
@@ -74,7 +196,8 @@ namespace MuTraProAPI.Controllers
                     user.Name,
                     user.Email,
                     Role = user.Role.ToString()
-                }
+                },
+                customerId = customer?.Id
             });
         }
         [HttpPost("logout")]

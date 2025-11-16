@@ -11,6 +11,13 @@ namespace MuTraProAPI.Data
         public DbSet<Product> Products { get; set; }
         public DbSet<MusicSubmission> MusicSubmissions { get; set; }
         public DbSet<Studio> Studios { get; set; }
+        
+        // Customer Service Tables
+        public DbSet<Customer> Customers { get; set; }
+        public DbSet<ServiceRequest> ServiceRequests { get; set; }
+        public DbSet<CustomerFeedback> CustomerFeedbacks { get; set; }
+        public DbSet<CustomerPayment> CustomerPayments { get; set; }
+        public DbSet<CustomerTransaction> CustomerTransactions { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Bắt buộc phải gọi base để đảm bảo các ánh xạ mặc định hoạt động
@@ -29,11 +36,19 @@ namespace MuTraProAPI.Data
                 .Property(m => m.Status)
                 .HasConversion<string>();
             
-            // THÊM CÁC CẤU HÌNH CHO CÁC ENUM KHÁC NẾU CÓ:
-            // Ví dụ: Nếu Order có cột Status là Enum và được lưu là ENUM/VARCHAR trong MySQL:
-            // modelBuilder.Entity<Order>()
-            //     .Property(o => o.Status)
-            //     .HasConversion<string>();
+            // Customer Service Enum Conversions
+            modelBuilder.Entity<ServiceRequest>()
+                .Property(s => s.ServiceType)
+                .HasConversion<string>();
+            modelBuilder.Entity<ServiceRequest>()
+                .Property(s => s.Status)
+                .HasConversion<string>();
+            modelBuilder.Entity<CustomerPayment>()
+                .Property(p => p.PaymentStatus)
+                .HasConversion<string>();
+            modelBuilder.Entity<CustomerTransaction>()
+                .Property(t => t.TransactionType)
+                .HasConversion<string>();
         }
     }
 }

@@ -3,70 +3,92 @@ session_start();
 $message = [];
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $email = $_POST['email'];
+    $email = trim($_POST['email']);
     $pass = $_POST['password'];
 
-    // Gọi API .NET (địa chỉ của bạn)
-    $api_url = "http://localhost:5200/api/Auth/login"; // ✅ Đúng với AuthController route
-
-    $data = json_encode([
-        "email" => $email,
-        "password" => $pass
-    ]);
-
-    $ch = curl_init($api_url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'Content-Type: application/json',
-        'Accept: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-
-    $response = curl_exec($ch);
-    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    // Xử lý phản hồi từ API
-    if ($http_code == 200) {
-        $result = json_decode($response, true);
-
-        // Lưu token + user info vào session
-        $_SESSION['token'] = $result['token'];
-        $_SESSION['user'] = $result['user'];
-
-        // Chuyển hướng theo role
-        $role = strtolower($result['user']['role']);
-        switch ($role) {
-            case 'admin':
-                header('Location: admin/admin_page.php');
-                break;
-            case 'user':
-                header('Location: dashboard.php');
-                break;
-            case 'coordinator':
-                header('Location: ../coordinator/coordinator_page.php');
-                break;
-            case 'arrangement':
-                header('Location: ../arrangement/arrangement_page.php');
-                break;
-            case 'transcription':
-                header('Location: ../transcription/transcription_page.php');
-                break;
-            case 'recording_artists':
-                header('Location: ../recording_artists/recording_artists_page.php');
-                break;
-            case 'studio':
-                header('Location: studio/studio_page.php');
-                break;
-            default:
-                header('Location: dashboard.php');
-                break;
-        }
-        exit();
+    // Validation: Email phải là định dạng email hợp lệ
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $message[] = 'Vui lòng nhập địa chỉ email hợp lệ!';
+    } elseif (strlen($pass) < 8) {
+        $message[] = 'Mật khẩu phải có ít nhất 8 ký tự!';
     } else {
-        $result = json_decode($response, true);
-        $message[] = $result['message'] ?? 'Đăng nhập thất bại! Vui lòng thử lại.';
+        // Gọi API .NET qua Kong Gateway (hoặc trực tiếp auth-service)
+        // Option 1: Qua Kong Gateway (khuyến nghị)
+        $api_url = "http://localhost:8000/api/Auth/login";
+        // Option 2: Trực tiếp auth-service (nếu chạy Docker)
+        // $api_url = "http://localhost:8081/api/Auth/login";
+        // Option 3: Local .NET service (nếu chạy local)
+        // $api_url = "http://localhost:5200/api/Auth/login";
+
+        $data = json_encode([
+            "email" => $email,
+            "password" => $pass
+        ]);
+
+        $ch = curl_init($api_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ]);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        // Xử lý phản hồi từ API
+        if ($http_code == 200) {
+            $result = json_decode($response, true);
+
+            // Lưu token + user info vào session
+            $_SESSION['token'] = $result['token'];
+            $_SESSION['user'] = $result['user'];
+
+            // Chuyển hướng theo role
+            $role = strtolower($result['user']['role']);
+            switch ($role) {
+                case 'admin':
+                    header('Location: admin/admin_page.php');
+                    break;
+                case 'user':
+                    // Redirect đến customer-dashboard ở service-2
+                    $customer_id = $result['customerId'] ?? '';
+                    $token = $result['token'] ?? '';
+                    $name = $result['user']['name'] ?? '';
+                    $redirect_url = "http://localhost:8080/customer-dashboard.html";
+                    if ($customer_id) {
+                        $redirect_url .= "?customerId=" . urlencode($customer_id);
+                        $redirect_url .= "&token=" . urlencode($token);
+                        $redirect_url .= "&name=" . urlencode($name);
+                    }
+                    header('Location: ' . $redirect_url);
+                    break;
+                case 'coordinator':
+                    header('Location: ../coordinator/coordinator_page.php');
+                    break;
+                case 'arrangement':
+                    header('Location: ../arrangement/arrangement_page.php');
+                    break;
+                case 'transcription':
+                    header('Location: ../transcription/transcription_page.php');
+                    break;
+                case 'recording_artists':
+                    header('Location: ../recording_artists/recording_artists_page.php');
+                    break;
+                case 'studio':
+                    header('Location: studio/studio_page.php');
+                    break;
+                default:
+                    header('Location: dashboard.php');
+                    break;
+            }
+            exit();
+        } else {
+            $result = json_decode($response, true);
+            $message[] = $result['message'] ?? 'Đăng nhập thất bại! Vui lòng thử lại.';
+        }
     }
 }
 ?>
@@ -140,8 +162,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 </div>
                 <input type="password" 
                        name="password" 
-                       placeholder="Nhập mật khẩu" 
+                       placeholder="Nhập mật khẩu (tối thiểu 8 ký tự)" 
                        required 
+                       minlength="8"
                        id="passwordInput"
                        class="w-full pl-12 pr-12 py-4 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all backdrop-blur-sm">
                 <button type="button" 
