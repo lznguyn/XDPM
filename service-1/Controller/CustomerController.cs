@@ -175,7 +175,7 @@ namespace MuTraProAPI.Controllers
                 Title = dto.Title,
                 Description = dto.Description,
                 FileName = dto.FileName,
-                Status = RequestStatus.Submitted,
+                Status = RequestStatus.Pending,
                 CreatedDate = DateTime.Now,
                 DueDate = dto.DueDate,
                 Priority = dto.Priority ?? "normal",
@@ -193,11 +193,15 @@ namespace MuTraProAPI.Controllers
                 title = request.Title,
                 description = request.Description,
                 file_name = request.FileName,
-                status = request.Status.ToString(),
+                status = request.Status.ToString(), // Sẽ trả về "Pending"
                 created_date = request.CreatedDate,
                 due_date = request.DueDate,
                 priority = request.Priority,
-                paid = request.Paid
+                paid = request.Paid,
+                preferred_specialist_id = request.PreferredSpecialistId,
+                scheduled_date = request.ScheduledDate,
+                scheduled_time_slot = request.ScheduledTimeSlot,
+                meeting_notes = request.MeetingNotes
             });
         }
 
@@ -343,7 +347,13 @@ namespace MuTraProAPI.Controllers
                 request.Paid = true;
             }
 
-            // Record transaction
+            // Save payment first to get the ID
+            await _context.SaveChangesAsync();
+            
+            // Reload payment to ensure we have the database-generated ID
+            await _context.Entry(payment).ReloadAsync();
+
+            // Record transaction AFTER payment is saved and reloaded (so we have payment.Id)
             var transaction = new CustomerTransaction
             {
                 CustomerId = dto.CustomerId,

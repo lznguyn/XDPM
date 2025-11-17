@@ -213,6 +213,7 @@ namespace MuTraProAPI.Controllers
             var requests = await _context.ServiceRequests
                 .Include(r => r.Customer)
                 .Include(r => r.AssignedSpecialist)
+                .Include(r => r.PreferredSpecialist)
                 .OrderByDescending(r => r.CreatedDate)
                 .Select(r => new
                 {
@@ -229,6 +230,11 @@ namespace MuTraProAPI.Controllers
                     r.DueDate,
                     r.AssignedSpecialistId,
                     AssignedSpecialistName = r.AssignedSpecialist != null ? r.AssignedSpecialist.Name : null,
+                    r.PreferredSpecialistId,
+                    PreferredSpecialistName = r.PreferredSpecialist != null ? r.PreferredSpecialist.Name : null,
+                    r.ScheduledDate,
+                    r.ScheduledTimeSlot,
+                    r.MeetingNotes,
                     r.Priority,
                     r.Paid
                 })
@@ -279,7 +285,10 @@ namespace MuTraProAPI.Controllers
             {
                 request.Status = status;
                 await _context.SaveChangesAsync();
-                return Ok(new { message = "Service request status updated successfully." });
+                return Ok(new { 
+                    message = "Service request status updated successfully.",
+                    status = request.Status.ToString()
+                });
             }
 
             return BadRequest(new { message = "Invalid status." });
@@ -301,6 +310,136 @@ namespace MuTraProAPI.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Service request assigned successfully." });
+        }
+
+        // POST: api/Admin/service-requests/{id}/accept
+        [HttpPost("service-requests/{id}/accept")]
+        public async Task<IActionResult> AcceptServiceRequest(int id)
+        {
+            var request = await _context.ServiceRequests.FindAsync(id);
+            if (request == null)
+                return NotFound();
+
+            if (request.Status != RequestStatus.Pending)
+                return BadRequest(new { message = "Only Pending requests can be accepted." });
+
+            request.Status = RequestStatus.InProgress;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Service request accepted successfully.", status = request.Status.ToString() });
+        }
+
+        // POST: api/Admin/service-requests/{id}/schedule
+        [HttpPost("service-requests/{id}/schedule")]
+        public async Task<IActionResult> ScheduleServiceRequest(int id, [FromBody] ScheduleServiceRequestDto dto)
+        {
+            var request = await _context.ServiceRequests.FindAsync(id);
+            if (request == null)
+                return NotFound();
+
+            if (request.Status != RequestStatus.PendingReview)
+                return BadRequest(new { message = "Only PendingReview requests can be scheduled." });
+
+            // Check if specialist schedule is available
+            var schedule = await _context.SpecialistSchedules
+                .FirstOrDefaultAsync(s => s.SpecialistId == dto.SpecialistId && 
+                                         s.Date.Date == dto.ScheduledDate.Date);
+
+            bool isAvailable = false;
+            if (schedule != null)
+            {
+                // Check if the time slot is available
+                isAvailable = dto.TimeSlot switch
+                {
+                    "0-4" => !schedule.TimeSlot1,
+                    "6-10" => !schedule.TimeSlot2,
+                    "12-16" => !schedule.TimeSlot3,
+                    "18-22" => !schedule.TimeSlot4,
+                    _ => false
+                };
+            }
+            else
+            {
+                // No schedule exists, so all slots are available
+                isAvailable = true;
+            }
+
+            if (!isAvailable)
+                return BadRequest(new { message = "Selected time slot is not available. Specialist schedule is full." });
+
+            // Update request
+            request.AssignedSpecialistId = dto.SpecialistId;
+            request.ScheduledDate = dto.ScheduledDate;
+            request.ScheduledTimeSlot = dto.TimeSlot;
+            request.MeetingNotes = dto.MeetingNotes;
+            request.Status = RequestStatus.Assigned;
+            await _context.SaveChangesAsync();
+
+            // Update or create specialist schedule
+            if (schedule == null)
+            {
+                schedule = new SpecialistSchedule
+                {
+                    SpecialistId = dto.SpecialistId,
+                    Date = dto.ScheduledDate.Date
+                };
+                _context.SpecialistSchedules.Add(schedule);
+            }
+
+            // Mark the time slot as booked
+            switch (dto.TimeSlot)
+            {
+                case "0-4":
+                    schedule.TimeSlot1 = true;
+                    break;
+                case "6-10":
+                    schedule.TimeSlot2 = true;
+                    break;
+                case "12-16":
+                    schedule.TimeSlot3 = true;
+                    break;
+                case "18-22":
+                    schedule.TimeSlot4 = true;
+                    break;
+            }
+            schedule.UpdatedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Service request scheduled successfully." });
+        }
+
+        // GET: api/Admin/specialists/{id}/schedule
+        [HttpGet("specialists/{id}/schedule")]
+        public async Task<IActionResult> GetSpecialistSchedule(int id, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
+        {
+            var specialist = await _context.Users.FindAsync(id);
+            if (specialist == null)
+                return NotFound(new { message = "Specialist not found" });
+
+            var query = _context.SpecialistSchedules.Where(s => s.SpecialistId == id);
+
+            if (startDate.HasValue)
+                query = query.Where(s => s.Date >= startDate.Value.Date);
+            if (endDate.HasValue)
+                query = query.Where(s => s.Date <= endDate.Value.Date);
+
+            var schedules = await query.OrderBy(s => s.Date).ToListAsync();
+
+            return Ok(schedules.Select(s => new
+            {
+                s.Id,
+                s.SpecialistId,
+                s.Date,
+                timeSlots = new
+                {
+                    slot1 = s.TimeSlot1, // 0-4h
+                    slot2 = s.TimeSlot2, // 6-10h
+                    slot3 = s.TimeSlot3, // 12-16h
+                    slot4 = s.TimeSlot4  // 18-22h
+                },
+                s.CreatedAt,
+                s.UpdatedAt
+            }));
         }
 
         // =====================================================
@@ -490,6 +629,14 @@ namespace MuTraProAPI.Controllers
         public class AssignServiceRequestDto
         {
             public int SpecialistId { get; set; }
+        }
+
+        public class ScheduleServiceRequestDto
+        {
+            public int SpecialistId { get; set; }
+            public DateTime ScheduledDate { get; set; }
+            public string TimeSlot { get; set; } = string.Empty; // "0-4", "6-10", "12-16", "18-22"
+            public string? MeetingNotes { get; set; }
         }
     }
 }

@@ -376,13 +376,35 @@ async def create_payment(
     payment_method: str = Form(...)
 ):
     """Process payment"""
+    import httpx
+    import os
+    
     try:
+        # Tạo payment record
         payment = await db_client.create_payment(
             customer_id=int(customer_id),
             service_request_id=int(service_request_id),
             amount=amount,
             payment_method=payment_method
         )
+        
+        # Sau khi tạo payment thành công, cập nhật paid status của service request
+        try:
+            auth_service_url = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8081")
+            async with httpx.AsyncClient() as client:
+                # Cập nhật paid status qua endpoint PATCH
+                update_response = await client.patch(
+                    f"{auth_service_url}/api/Customer/requests/{service_request_id}/paid",
+                    json={"paid": True},
+                    timeout=10.0
+                )
+                if update_response.status_code == 200:
+                    print(f"[PAYMENT] Successfully updated paid status for request {service_request_id}")
+                else:
+                    print(f"[PAYMENT] Warning: Could not update request paid status: {update_response.status_code} - {update_response.text}")
+        except Exception as e:
+            # Log error nhưng không fail payment
+            print(f"[PAYMENT] Warning: Could not update request paid status: {e}")
         
         return {
             "id": str(payment["id"]),
@@ -395,7 +417,65 @@ async def create_payment(
             "transaction_id": payment.get("transaction_id")
         }
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        print(f"[PAYMENT ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/payments/qr/{request_id}")
+async def generate_payment_qr(request_id: str, amount: float = 50000):
+    """Generate VietQR code for payment"""
+    import qrcode
+    from io import BytesIO
+    import base64
+    
+    try:
+        # Thông tin tài khoản ngân hàng (có thể cấu hình qua environment variables)
+        bank_account = os.getenv("BANK_ACCOUNT", "1234567890")  # Số tài khoản ngân hàng
+        bank_code = os.getenv("BANK_CODE", "970422")  # Mã ngân hàng (970422 = Techcombank)
+        bank_name = os.getenv("BANK_NAME", "Ngân hàng Techcombank")
+        
+        # Format nội dung chuyển khoản
+        content = f"Thanh toan don hang {request_id}"
+        
+        # Tạo chuỗi VietQR theo format đơn giản
+        # Format: bank_account|bank_code|amount|content
+        # Có thể mở rộng để dùng format EMV QR Code nếu cần
+        qr_data = f"{bank_account}|{bank_code}|{int(amount)}|{content}"
+        
+        # Tạo QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        
+        # Tạo image
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convert to base64
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        img_str = base64.b64encode(buffer.getvalue()).decode()
+        
+        return {
+            "qr_code": f"data:image/png;base64,{img_str}",
+            "qr_data": qr_data,
+            "bank_account": bank_account,
+            "bank_code": bank_code,
+            "bank_name": bank_name,
+            "amount": amount,
+            "content": content,
+            "request_id": request_id
+        }
+    except Exception as e:
+        print(f"[QR ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/transactions/{customer_id}")
 async def get_customer_transactions(customer_id: str):

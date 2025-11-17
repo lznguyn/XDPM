@@ -1346,26 +1346,48 @@
             }
         }
 
-        function openPaymentModal(requestId) {
+        async function openPaymentModal(requestId) {
             const modalBody = document.getElementById('paymentModalBody');
             modalBody.innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div style="font-size: 24px; font-weight: bold; color: #667eea; margin-bottom: 10px;">50,000 ₫</div>
+                    <div style="color: #999; font-size: 14px;">Mã đơn hàng: #${requestId.substring(0, 8)}</div>
+                </div>
+                
                 <form onsubmit="processPayment(event, '${requestId}')">
                     <div class="form-group">
-                        <label>Số Tiền: 50,000 ₫</label>
-                    </div>
-                    <div class="form-group">
                         <label>Phương Thức Thanh Toán *</label>
-                        <select id="paymentMethod" required>
+                        <select id="paymentMethod" required onchange="handlePaymentMethodChange('${requestId}')">
                             <option value="">-- Chọn Phương Thức --</option>
+                            <option value="bank_transfer">🏦 Chuyển Khoản Ngân Hàng (VietQR)</option>
                             <option value="credit_card">💳 Thẻ Tín Dụng</option>
-                            <option value="bank_transfer">🏦 Chuyển Khoản Ngân Hàng</option>
                             <option value="wallet">💰 Ví Điện Tử</option>
                         </select>
                     </div>
+                    
+                    <div id="qrCodeSection" style="display: none; margin: 20px 0;">
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; text-align: center;">
+                            <div style="font-weight: 600; margin-bottom: 15px; color: #333;">Quét mã QR để thanh toán</div>
+                            <div id="qrCodeContainer" style="display: flex; justify-content: center; margin: 15px 0;">
+                                <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <img id="qrCodeImage" src="" alt="QR Code" style="width: 200px; height: 200px;">
+                                </div>
+                            </div>
+                            <div id="bankInfo" style="margin-top: 15px; font-size: 14px; color: #666;">
+                                <div style="margin-bottom: 5px;"><strong>Thông tin tài khoản:</strong></div>
+                                <div id="bankAccountInfo"></div>
+                            </div>
+                            <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 6px; font-size: 13px; color: #856404;">
+                                ⚠️ Sau khi chuyển khoản, vui lòng nhấn "Xác nhận đã thanh toán" để hoàn tất
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="form-group">
                         <label>Tên Người Thanh Toán</label>
-                        <input type="text" id="payerName" placeholder="Nhập tên">
+                        <input type="text" id="payerName" placeholder="Nhập tên" value="${localStorage.getItem('customerName') || ''}">
                     </div>
+                    
                     <div style="display: flex; gap: 10px;">
                         <button type="submit" class="btn btn-primary" style="flex: 1;">✓ Xác Nhận Thanh Toán</button>
                         <button type="button" class="btn btn-secondary" onclick="closePaymentModal()" style="flex: 1;">✕ Hủy</button>
@@ -1373,6 +1395,44 @@
                 </form>
             `;
             document.getElementById('paymentModal').classList.add('active');
+        }
+        
+        async function handlePaymentMethodChange(requestId) {
+            const method = document.getElementById('paymentMethod').value;
+            const qrSection = document.getElementById('qrCodeSection');
+            
+            if (method === 'bank_transfer') {
+                qrSection.style.display = 'block';
+                await loadQRCode(requestId);
+            } else {
+                qrSection.style.display = 'none';
+            }
+        }
+        
+        async function loadQRCode(requestId) {
+            try {
+                const response = await fetch(`${API_BASE}/payments/qr/${requestId}?amount=50000`);
+                if (!response.ok) throw new Error('Không thể tạo mã QR');
+                
+                const qrData = await response.json();
+                
+                // Hiển thị QR code
+                document.getElementById('qrCodeImage').src = qrData.qr_code;
+                
+                // Hiển thị thông tin ngân hàng
+                document.getElementById('bankAccountInfo').innerHTML = `
+                    <div><strong>Số tài khoản:</strong> ${qrData.bank_account}</div>
+                    <div><strong>Ngân hàng:</strong> ${qrData.bank_name}</div>
+                    <div><strong>Nội dung:</strong> ${qrData.content}</div>
+                `;
+            } catch (error) {
+                console.error('Error loading QR code:', error);
+                document.getElementById('qrCodeSection').innerHTML = `
+                    <div style="padding: 20px; background: #ffe0e0; border-radius: 8px; color: #c92a2a;">
+                        ❌ Không thể tạo mã QR. Vui lòng thử lại.
+                    </div>
+                `;
+            }
         }
 
         async function processPayment(event, requestId) {

@@ -32,7 +32,7 @@ namespace MuTraProAPI.Models
 
         [Required]
         [Column("status")]
-        public RequestStatus Status { get; set; } = RequestStatus.Submitted;
+        public RequestStatus Status { get; set; } = RequestStatus.Pending;
 
         [Column("created_date")]
         public DateTime CreatedDate { get; set; } = DateTime.Now;
@@ -51,6 +51,21 @@ namespace MuTraProAPI.Models
 
         [Column("paid")]
         public bool Paid { get; set; } = false;
+
+        [Column("preferred_specialist_id")]
+        public int? PreferredSpecialistId { get; set; }
+
+        [ForeignKey("PreferredSpecialistId")]
+        public User? PreferredSpecialist { get; set; }
+
+        [Column("scheduled_date")]
+        public DateTime? ScheduledDate { get; set; }
+
+        [Column("scheduled_time_slot")]
+        public string? ScheduledTimeSlot { get; set; }
+
+        [Column("meeting_notes")]
+        public string? MeetingNotes { get; set; }
     }
 
     public enum ServiceType
@@ -62,6 +77,7 @@ namespace MuTraProAPI.Models
 
     public enum RequestStatus
     {
+        Pending,
         Submitted,
         Assigned,
         InProgress,

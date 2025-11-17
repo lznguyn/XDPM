@@ -88,19 +88,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     exit();
                     break;
                 case 'coordinator':
-                    header('Location: ../coordinator/coordinator_page.php');
-                    break;
                 case 'arrangement':
-                    header('Location: ../arrangement/arrangement_page.php');
-                    break;
                 case 'transcription':
-                    header('Location: ../transcription/transcription_page.php');
-                    break;
-                case 'recording_artists':
-                    header('Location: ../recording_artists/recording_artists_page.php');
-                    break;
+                case 'recorder':
                 case 'studio':
-                    header('Location: studio/studio_page.php');
+                    // Tất cả chuyên gia đều redirect đến arrangement_page.php
+                    header('Location: arrangement/arrangement_page.php');
                     break;
                 default:
                     header('Location: dashboard.php');

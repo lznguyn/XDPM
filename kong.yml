@@ -13,6 +13,7 @@ services:
           - /api/Customer
           - /api/Studio
           - /api/Arrangement
+          - /api/Specialist
         strip_path: false
         preserve_host: true
 

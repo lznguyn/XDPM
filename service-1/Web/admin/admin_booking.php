@@ -39,6 +39,30 @@ function callApi($url, $method = 'GET', $data = null, $token = '')
     ];
 }
 
+// ✅ Xử lý chấp nhận request (Pending → InProgress)
+if (isset($_GET['accept_request'])) {
+    $requestId = intval($_GET['accept_request']);
+    $res = callApi("$apiBase/service-requests/$requestId/accept", "POST", null, $token);
+
+    if ($res['code'] == 200) {
+        $_SESSION['toast_message'] = "✅ Đã chấp nhận yêu cầu thành công!";
+        // Redirect về tab InProgress vì status đã chuyển từ Pending → InProgress
+        $newStatus = $res['body']['status'] ?? 'InProgress';
+        // Đảm bảo status đúng format
+        $newStatus = ucfirst($newStatus);
+        if ($newStatus === 'Inprogress') {
+            $newStatus = 'InProgress';
+        }
+        header('location:admin_booking.php?tab=' . urlencode($newStatus));
+    } else {
+        $_SESSION['toast_message'] = "❌ Lỗi chấp nhận: " . ($res['body']['message'] ?? 'Unknown error');
+        // Giữ tab hiện tại nếu có lỗi
+        $currentTab = $_GET['tab'] ?? 'Pending';
+        header('location:admin_booking.php?tab=' . urlencode($currentTab));
+    }
+    exit();
+}
+
 // ✅ Xử lý cập nhật trạng thái
 if (isset($_GET['update_status'])) {
     $requestId = intval($_GET['update_status']);
@@ -47,13 +71,41 @@ if (isset($_GET['update_status'])) {
 
     if ($res['code'] == 200) {
         $_SESSION['toast_message'] = "✅ Đã cập nhật trạng thái thành công!";
+        // Redirect về tab tương ứng với status mới
+        // Lấy status từ API response, nếu không có thì dùng status từ request
+        $newStatus = $res['body']['status'] ?? $status;
+        // Đảm bảo status đúng format (Capitalize first letter)
+        $newStatus = ucfirst($newStatus);
+        // Map các status có thể có (case-insensitive)
+        $statusMap = [
+            'Pending' => 'Pending',
+            'pending' => 'Pending',
+            'Submitted' => 'Submitted',
+            'submitted' => 'Submitted',
+            'Assigned' => 'Assigned',
+            'assigned' => 'Assigned',
+            'Inprogress' => 'InProgress',
+            'InProgress' => 'InProgress',
+            'inprogress' => 'InProgress',
+            'Pendingreview' => 'PendingReview',
+            'PendingReview' => 'PendingReview',
+            'pendingreview' => 'PendingReview',
+            'Completed' => 'Completed',
+            'completed' => 'Completed',
+            'Revisionrequested' => 'RevisionRequested',
+            'RevisionRequested' => 'RevisionRequested',
+            'revisionrequested' => 'RevisionRequested',
+            'Cancelled' => 'Cancelled',
+            'cancelled' => 'Cancelled'
+        ];
+        $newStatus = $statusMap[$newStatus] ?? $newStatus;
+        header('location:admin_booking.php?tab=' . urlencode($newStatus));
     } else {
         $_SESSION['toast_message'] = "❌ Lỗi cập nhật trạng thái: " . ($res['body']['message'] ?? 'Unknown error');
+        // Giữ tab hiện tại nếu có lỗi
+        $currentTab = $_GET['tab'] ?? 'all';
+        header('location:admin_booking.php?tab=' . urlencode($currentTab));
     }
-
-    // Giữ tab hiện tại sau khi cập nhật
-    $tab = $_GET['tab'] ?? 'all';
-    header('location:admin_booking.php?tab=' . urlencode($tab));
     exit();
 }
 
@@ -61,21 +113,62 @@ if (isset($_GET['update_status'])) {
 $res = callApi("$apiBase/service-requests", "GET", null, $token);
 $allRequests = $res['body'] ?? [];
 
-// Phân loại requests theo trạng thái
+// Debug: Log số lượng requests và status (có thể xóa sau)
+if (empty($allRequests)) {
+    error_log("Admin Booking: No requests found. API response code: " . ($res['code'] ?? 'N/A'));
+} else {
+    error_log("Admin Booking: Loaded " . count($allRequests) . " requests");
+    // Log status distribution
+    $statusCounts = [];
+    foreach ($allRequests as $req) {
+        $s = normalizeStatus($req['status'] ?? '');
+        $statusCounts[$s] = ($statusCounts[$s] ?? 0) + 1;
+    }
+    error_log("Status distribution: " . json_encode($statusCounts));
+}
+
+// Hàm normalize status để so sánh
+function normalizeStatus($status) {
+    if (empty($status)) return '';
+    // Chuyển về dạng chuẩn (Capitalize first letter, handle camelCase)
+    $status = trim($status);
+    $statusMap = [
+        'pending' => 'Pending',
+        'submitted' => 'Submitted',
+        'assigned' => 'Assigned',
+        'inprogress' => 'InProgress',
+        'in_progress' => 'InProgress',
+        'pendingreview' => 'PendingReview',
+        'pending_review' => 'PendingReview',
+        'completed' => 'Completed',
+        'revisionrequested' => 'RevisionRequested',
+        'revision_requested' => 'RevisionRequested',
+        'cancelled' => 'Cancelled',
+        'canceled' => 'Cancelled'
+    ];
+    $lowerStatus = strtolower($status);
+    return $statusMap[$lowerStatus] ?? ucfirst($status);
+}
+
+// Phân loại requests theo trạng thái (case-insensitive)
 $requestsByStatus = [
     'all' => $allRequests,
-    'Submitted' => array_filter($allRequests, fn($r) => ($r['status'] ?? '') === 'Submitted'),
-    'Assigned' => array_filter($allRequests, fn($r) => ($r['status'] ?? '') === 'Assigned'),
-    'InProgress' => array_filter($allRequests, fn($r) => ($r['status'] ?? '') === 'InProgress'),
-    'PendingReview' => array_filter($allRequests, fn($r) => ($r['status'] ?? '') === 'PendingReview'),
-    'Completed' => array_filter($allRequests, fn($r) => ($r['status'] ?? '') === 'Completed'),
-    'RevisionRequested' => array_filter($allRequests, fn($r) => ($r['status'] ?? '') === 'RevisionRequested'),
-    'Cancelled' => array_filter($allRequests, fn($r) => ($r['status'] ?? '') === 'Cancelled')
+    'Pending' => array_filter($allRequests, fn($r) => normalizeStatus($r['status'] ?? '') === 'Pending'),
+    'Submitted' => array_filter($allRequests, fn($r) => normalizeStatus($r['status'] ?? '') === 'Submitted'),
+    'Assigned' => array_filter($allRequests, fn($r) => normalizeStatus($r['status'] ?? '') === 'Assigned'),
+    'InProgress' => array_filter($allRequests, fn($r) => normalizeStatus($r['status'] ?? '') === 'InProgress'),
+    'PendingReview' => array_filter($allRequests, fn($r) => normalizeStatus($r['status'] ?? '') === 'PendingReview'),
+    'Completed' => array_filter($allRequests, fn($r) => normalizeStatus($r['status'] ?? '') === 'Completed'),
+    'RevisionRequested' => array_filter($allRequests, fn($r) => normalizeStatus($r['status'] ?? '') === 'RevisionRequested'),
+    'Cancelled' => array_filter($allRequests, fn($r) => normalizeStatus($r['status'] ?? '') === 'Cancelled')
 ];
 
-// Lấy tab hiện tại từ URL
-$currentTab = $_GET['tab'] ?? 'all';
+// Lấy tab hiện tại từ URL - mặc định là Pending
+$currentTab = $_GET['tab'] ?? 'Pending';
 $requests = $requestsByStatus[$currentTab] ?? $allRequests;
+
+// Debug: Log current tab and request count
+error_log("Admin Booking: Current tab = '$currentTab', Requests count = " . count($requests));
 ?>
 
 <!DOCTYPE html>
@@ -130,6 +223,10 @@ $requests = $requestsByStatus[$currentTab] ?? $allRequests;
                class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'all' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">
                 <i class="fas fa-list mr-2"></i>Tất cả (<?= count($requestsByStatus['all']) ?>)
             </a>
+            <a href="?tab=Pending" 
+               class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'Pending' ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-700 hover:bg-orange-100' ?>">
+                <i class="fas fa-clock mr-2"></i>Chờ duyệt (<?= count($requestsByStatus['Pending']) ?>)
+            </a>
             <a href="?tab=Submitted" 
                class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'Submitted' ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100' ?>">
                 <i class="fas fa-paper-plane mr-2"></i>Mới gửi (<?= count($requestsByStatus['Submitted']) ?>)
@@ -177,7 +274,7 @@ $requests = $requestsByStatus[$currentTab] ?? $allRequests;
         <?php else: ?>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <?php foreach ($requests as $req): 
-                    $status = $req['status'] ?? 'Submitted';
+                    $status = normalizeStatus($req['status'] ?? 'Submitted');
                     $serviceType = $req['serviceType'] ?? 'Transcription';
                     $priority = $req['priority'] ?? 'normal';
                     
@@ -297,6 +394,14 @@ function showToast(message, type = "success") {
         toast.classList.add("opacity-0", "transition");
         setTimeout(() => toast.remove(), 500);
     }, 3000);
+}
+
+function acceptRequest(requestId) {
+    if (!confirm('Bạn có chắc muốn chấp nhận yêu cầu này? Yêu cầu sẽ chuyển sang trạng thái "Đang xử lý".')) {
+        return;
+    }
+    
+    window.location.href = `?accept_request=${requestId}`;
 }
 
 function updateStatus(requestId) {
