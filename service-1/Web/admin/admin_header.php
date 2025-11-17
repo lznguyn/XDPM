@@ -120,31 +120,31 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 });
-// Gọi API logout ASP.NET Core
+// Xử lý logout
 document.getElementById('logoutBtn')?.addEventListener('click', async () => {
     if (!confirm("Bạn có chắc chắn muốn đăng xuất không?")) return;
 
     const token = '<?php echo $_SESSION['token'] ?? ''; ?>';
 
-    try {
-        const res = await fetch('http://localhost:5200/api/Auth/logout', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token
-            }
-        });
-
-        if (!res.ok) throw new Error('API logout thất bại');
-
-        const data = await res.json();
-        console.log('Server:', data);
-
-        // Gọi PHP để xóa session
-        window.location.href = 'admin_logout.php';
-    } catch (error) {
-        console.error('Logout error:', error);
-        alert('Có lỗi khi đăng xuất, vui lòng thử lại!');
+    // Thử gọi API logout (không bắt buộc, vì JWT là stateless)
+    if (token) {
+        try {
+            // Gọi qua Kong Gateway
+            const res = await fetch('http://localhost:8000/api/Auth/logout', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            });
+            // Không cần kiểm tra kết quả, vì logout chủ yếu là xóa session ở client
+        } catch (error) {
+            // Bỏ qua lỗi API, vẫn tiếp tục logout
+            console.log('API logout optional:', error);
+        }
     }
+
+    // Chuyển đến trang logout PHP để xóa session
+    window.location.href = 'admin_logout.php';
 });
 
 </script>

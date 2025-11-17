@@ -38,21 +38,31 @@ services:
 
   # ================== BACKEND SERVICE (TRANSCRIPTASE) ==================
   - name: backend-service
-    url: http://backend:8000
+    url: http://backend-service:8000
     routes:
       - name: backend-route
         paths:
           - /api/v1
         strip_path: false
         preserve_host: true
+      - name: backend-health-route
+        paths:
+          - /health
+        strip_path: false
+        preserve_host: true
 
   # ================== CUSTOMER SERVICE ==================
   - name: customer-service
-    url: http://backend:8001
+    url: http://customer-service:8001
     routes:
       - name: customer-route
         paths:
-          - /api/customer
+          - /customers
+          - /requests
+          - /feedback
+          - /payments
+          - /transactions
+          - /health
         strip_path: false
         preserve_host: true
 

@@ -1,11 +1,22 @@
 <?php
+session_start();
 
-include '../user/config.php';
+// Xóa tất cả session variables
+$_SESSION = array();
 
-session_start();//bat dau phien lam viec
-session_unset();// xoa tat ca bien trong phien lam viec
-session_destroy();// huy phien lam viec hien tai
+// Xóa session cookie nếu có
+if (ini_get("session.use_cookies")) {
+    $params = session_get_cookie_params();
+    setcookie(session_name(), '', time() - 42000,
+        $params["path"], $params["domain"],
+        $params["secure"], $params["httponly"]
+    );
+}
 
-header('location: ../login.php');// chuyen huong den trang login.php
+// Hủy session
+session_destroy();
 
+// Chuyển hướng về trang login
+header('Location: ../login.php');
+exit();
 ?>

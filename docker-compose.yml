@@ -39,6 +39,7 @@ services:
     depends_on:
       - auth-service
       - customer-service
+      - backend-service
 
   # -------------------------
   # Auth Service (.NET)
@@ -83,8 +84,28 @@ services:
       auth-service:
         condition: service_started
 
+  # -------------------------
+  # Backend Service (Music Transcriber - FastAPI)
+  # -------------------------
+  backend-service:
+    build:
+      context: ./service-2/backend
+    container_name: backend-service
+    expose:
+      - "8000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8000
+    volumes:
+      - backend-uploads:/app/uploads
+      - backend-outputs:/app/outputs
+    depends_on:
+      - mysql
+
 # -------------------------
-# Volume cho MySQL
+# Volumes
 # -------------------------
 volumes:
   mysql-data:
+  backend-uploads:
+  backend-outputs:

@@ -51,6 +51,7 @@ if (isset($_GET['update_status'])) {
         $_SESSION['toast_message'] = "❌ Lỗi cập nhật trạng thái: " . ($res['body']['message'] ?? 'Unknown error');
     }
 
+    // Giữ tab hiện tại sau khi cập nhật
     $tab = $_GET['tab'] ?? 'all';
     header('location:admin_booking.php?tab=' . urlencode($tab));
     exit();
@@ -126,35 +127,35 @@ $requests = $requestsByStatus[$currentTab] ?? $allRequests;
     <div class="max-w-7xl mx-auto px-4 pt-6">
         <div class="bg-white rounded-xl shadow-sm p-2 flex flex-wrap gap-2 overflow-x-auto">
             <a href="?tab=all" 
-               class="px-4 py-2 rounded-lg font-medium transition <?= $currentTab === 'all' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">
+               class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'all' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' ?>">
                 <i class="fas fa-list mr-2"></i>Tất cả (<?= count($requestsByStatus['all']) ?>)
             </a>
             <a href="?tab=Submitted" 
-               class="px-4 py-2 rounded-lg font-medium transition <?= $currentTab === 'Submitted' ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100' ?>">
+               class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'Submitted' ? 'bg-blue-500 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100' ?>">
                 <i class="fas fa-paper-plane mr-2"></i>Mới gửi (<?= count($requestsByStatus['Submitted']) ?>)
             </a>
             <a href="?tab=Assigned" 
-               class="px-4 py-2 rounded-lg font-medium transition <?= $currentTab === 'Assigned' ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' ?>">
+               class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'Assigned' ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' ?>">
                 <i class="fas fa-user-check mr-2"></i>Đã gán (<?= count($requestsByStatus['Assigned']) ?>)
             </a>
             <a href="?tab=InProgress" 
-               class="px-4 py-2 rounded-lg font-medium transition <?= $currentTab === 'InProgress' ? 'bg-purple-500 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100' ?>">
+               class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'InProgress' ? 'bg-purple-500 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100' ?>">
                 <i class="fas fa-spinner mr-2"></i>Đang xử lý (<?= count($requestsByStatus['InProgress']) ?>)
             </a>
             <a href="?tab=PendingReview" 
-               class="px-4 py-2 rounded-lg font-medium transition <?= $currentTab === 'PendingReview' ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-700 hover:bg-orange-100' ?>">
+               class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'PendingReview' ? 'bg-orange-500 text-white' : 'bg-orange-50 text-orange-700 hover:bg-orange-100' ?>">
                 <i class="fas fa-eye mr-2"></i>Chờ xem xét (<?= count($requestsByStatus['PendingReview']) ?>)
             </a>
             <a href="?tab=Completed" 
-               class="px-4 py-2 rounded-lg font-medium transition <?= $currentTab === 'Completed' ? 'bg-green-500 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100' ?>">
+               class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'Completed' ? 'bg-green-500 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100' ?>">
                 <i class="fas fa-check-circle mr-2"></i>Hoàn thành (<?= count($requestsByStatus['Completed']) ?>)
             </a>
             <a href="?tab=RevisionRequested" 
-               class="px-4 py-2 rounded-lg font-medium transition <?= $currentTab === 'RevisionRequested' ? 'bg-red-500 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100' ?>">
+               class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'RevisionRequested' ? 'bg-red-500 text-white' : 'bg-red-50 text-red-700 hover:bg-red-100' ?>">
                 <i class="fas fa-edit mr-2"></i>Yêu cầu chỉnh sửa (<?= count($requestsByStatus['RevisionRequested']) ?>)
             </a>
             <a href="?tab=Cancelled" 
-               class="px-4 py-2 rounded-lg font-medium transition <?= $currentTab === 'Cancelled' ? 'bg-gray-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100' ?>">
+               class="px-4 py-2 rounded-lg font-medium transition whitespace-nowrap <?= $currentTab === 'Cancelled' ? 'bg-gray-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100' ?>">
                 <i class="fas fa-times-circle mr-2"></i>Đã hủy (<?= count($requestsByStatus['Cancelled']) ?>)
             </a>
         </div>

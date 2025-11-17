@@ -304,6 +304,45 @@ namespace MuTraProAPI.Controllers
         }
 
         // =====================================================
+        // USER MANAGEMENT ENDPOINTS
+        // =====================================================
+
+        [HttpGet("users")]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            var users = await _context.Users
+                .OrderByDescending(u => u.Id)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.Name,
+                    u.Email,
+                    Role = u.Role.ToString()
+                })
+                .ToListAsync();
+
+            return Ok(users);
+        }
+
+        [HttpGet("users/{id}")]
+        public async Task<IActionResult> GetUserById(int id)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == id);
+
+            if (user == null)
+                return NotFound(new { message = "User not found" });
+
+            return Ok(new
+            {
+                user.Id,
+                user.Name,
+                user.Email,
+                Role = user.Role.ToString()
+            });
+        }
+
+        // =====================================================
         // PAYMENT MANAGEMENT ENDPOINTS
         // =====================================================
 

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MuTraProAPI.Models;
 using MuTraProAPI.Data;
+using BCrypt.Net;
 
 namespace MuTraProAPI.Controllers
 {
@@ -27,6 +28,39 @@ namespace MuTraProAPI.Controllers
             if (existingCustomer != null)
                 return BadRequest(new { message = "Email already exists" });
 
+            // Nếu không có UserId được cung cấp, tự động tạo User record
+            int? userId = dto.UserId;
+            if (!userId.HasValue)
+            {
+                // Kiểm tra xem User với email này đã tồn tại chưa
+                var existingUser = await _context.Users
+                    .FirstOrDefaultAsync(u => u.Email == dto.Email);
+                
+                if (existingUser == null)
+                {
+                    // Tạo User mới với role User và password mặc định (có thể cần đổi sau)
+                    // Tạo password hash mặc định (khách hàng sẽ cần đổi password khi đăng nhập lần đầu)
+                    var defaultPassword = BCrypt.Net.BCrypt.HashPassword("TempPassword123!");
+                    
+                    var newUser = new User
+                    {
+                        Name = dto.Name,
+                        Email = dto.Email,
+                        PasswordHash = defaultPassword,
+                        Role = UserRole.User
+                    };
+                    
+                    _context.Users.Add(newUser);
+                    await _context.SaveChangesAsync();
+                    userId = newUser.Id;
+                }
+                else
+                {
+                    // Nếu User đã tồn tại, sử dụng UserId đó
+                    userId = existingUser.Id;
+                }
+            }
+
             var customer = new Customer
             {
                 Name = dto.Name,
@@ -35,7 +69,7 @@ namespace MuTraProAPI.Controllers
                 Address = dto.Address,
                 AccountCreated = DateTime.Now,
                 IsActive = true,
-                UserId = dto.UserId
+                UserId = userId
             };
 
             _context.Customers.Add(customer);
@@ -49,7 +83,8 @@ namespace MuTraProAPI.Controllers
                 phone = customer.Phone,
                 address = customer.Address,
                 account_created = customer.AccountCreated,
-                is_active = customer.IsActive
+                is_active = customer.IsActive,
+                user_id = customer.UserId
             });
         }
 

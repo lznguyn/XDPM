@@ -405,7 +405,7 @@
                             const customer = customers.find(c => c.email === email);
                             if (customer) {
                                 localStorage.setItem('customerId', customer.id.toString());
-                                localStorage.setItem('customerName', customer.name);
+                localStorage.setItem('customerName', customer.name);
                             }
                         }
                     } catch (e) {

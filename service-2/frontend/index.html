@@ -339,7 +339,7 @@ Transcription Text:
 ${lastTranscribeResult.transcription_text}
     `);
     
-    const response = await fetch(`${CUSTOMER_API_BASE}/requests/customer/${customerId}`, {
+    const response = await fetch(`${CUSTOMER_API_BASE}/requests`, {
       method: 'POST',
       body: formData
     });

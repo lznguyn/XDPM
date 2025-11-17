@@ -57,13 +57,35 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $customer_id = $result['customerId'] ?? '';
                     $token = $result['token'] ?? '';
                     $name = $result['user']['name'] ?? '';
+                    $user_id = $result['user']['id'] ?? '';
+                    $email = $result['user']['email'] ?? '';
+                    
+                    // Luôn redirect đến customer-dashboard với thông tin đầy đủ
                     $redirect_url = "http://localhost:8080/customer-dashboard.html";
+                    $params = [];
+                    
                     if ($customer_id) {
-                        $redirect_url .= "?customerId=" . urlencode($customer_id);
-                        $redirect_url .= "&token=" . urlencode($token);
-                        $redirect_url .= "&name=" . urlencode($name);
+                        $params[] = "customerId=" . urlencode($customer_id);
                     }
+                    if ($token) {
+                        $params[] = "token=" . urlencode($token);
+                    }
+                    if ($name) {
+                        $params[] = "name=" . urlencode($name);
+                    }
+                    if ($user_id) {
+                        $params[] = "userId=" . urlencode($user_id);
+                    }
+                    if ($email) {
+                        $params[] = "email=" . urlencode($email);
+                    }
+                    
+                    if (!empty($params)) {
+                        $redirect_url .= "?" . implode("&", $params);
+                    }
+                    
                     header('Location: ' . $redirect_url);
+                    exit();
                     break;
                 case 'coordinator':
                     header('Location: ../coordinator/coordinator_page.php');

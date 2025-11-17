@@ -182,11 +182,41 @@ namespace MuTraProAPI.Controllers
 
             var token = GenerateJwtToken(user);
 
-            // Tìm Customer record nếu role là User
+            // Tìm hoặc tạo Customer record nếu role là User
             Customer? customer = null;
             if (user.Role == UserRole.User)
             {
                 customer = await _context.Customers.FirstOrDefaultAsync(c => c.UserId == user.Id);
+                
+                // Nếu chưa có Customer record, tạo mới
+                if (customer == null)
+                {
+                    // Kiểm tra xem có Customer với email này chưa (có thể được tạo từ customer-service)
+                    customer = await _context.Customers.FirstOrDefaultAsync(c => c.Email == user.Email);
+                    
+                    if (customer != null)
+                    {
+                        // Nếu có Customer với email này nhưng chưa có UserId, cập nhật UserId
+                        customer.UserId = user.Id;
+                        customer.Name = user.Name; // Cập nhật tên nếu có thay đổi
+                        customer.IsActive = true;
+                        await _context.SaveChangesAsync();
+                    }
+                    else
+                    {
+                        // Tạo Customer mới
+                        customer = new Customer
+                        {
+                            Name = user.Name,
+                            Email = user.Email,
+                            UserId = user.Id,
+                            AccountCreated = DateTime.Now,
+                            IsActive = true
+                        };
+                        _context.Customers.Add(customer);
+                        await _context.SaveChangesAsync();
+                    }
+                }
             }
 
             return Ok(new {
