@@ -91,12 +91,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 case 'arrangement':
                 case 'transcription':
                 case 'recorder':
-                case 'studio':
                     // Tất cả chuyên gia đều redirect đến arrangement_page.php
                     header('Location: arrangement/arrangement_page.php');
                     break;
+                case 'studio':
+                    header('Location: studio/studio_page.php');
+                    break;
                 default:
-                    header('Location: dashboard.php');
+                    header('Location: login.php');
                     break;
             }
             exit();
