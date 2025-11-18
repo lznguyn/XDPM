@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         curl_close($ch);
 
         // Xử lý phản hồi từ API
-        if ($http_code == 200) {
+        if ($http_code == 200) S{
             $result = json_decode($response, true);
 
             // Lưu token + user info vào session

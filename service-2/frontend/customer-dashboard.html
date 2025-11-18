@@ -678,6 +678,44 @@
                 🚀 Gửi Yêu Cầu
             </button>
         </div>
+        <!--- Studio --->
+        <div id="studio" class="tab-content">
+            <h2>🏢 Đặt Studio</h2>
++            <div id="studioMessage"></div>
++
++            <div class="form-group">
++                <label>Chọn Studio *</label>
++                <select id="studioSelect">
++                    <option value="">-- Đang tải danh sách studio... --</option>
++                </select>
++            </div>
+
+            <div class="form-group">
++                <label>Loại Dịch Vụ *</label>
++                <select id="studioServiceType">
++                    <option value="">-- Chọn Loại Dịch Vụ --</option>
++                    <option value="recording">🎙️ Thu Âm</option>
++                    <option value="mixing">🎚️ Mix & Master</option>
++                    <option value="rehearsal">🎧 Thu Thử / Tập</option>
++                </select>
++           </div>
+
+            <div class="form-row">
+              <div class="form-group">
++                    <label>Ngày Dự Kiến</label>
++                    <input type="date" id="studioDate">
++                </div>
++                <div class="form-group">
++                    <label>Thời Gian</label>
++                    <input type="time" id="studioTime">
++                </div>
++            </div>  
+            <div class="form-group">
++                <label>Ghi chú</label>
++                <textarea id="studioNotes" placeholder="Mô tả yêu cầu cho studio..."></textarea>
++            </div>
++            <button class="btn btn-primary" onclick="submitStudioOrder()" style="width: 100%;">📅 Đặt Studio</button>
+        </div>
 
         <!-- Tracking Tab -->
         <div id="tracking" class="tab-content">
@@ -842,6 +880,7 @@
             if (tabName === 'tracking') loadRequests();
             if (tabName === 'payments') loadPayments();
             if (tabName === 'feedback') loadFeedback();
+            if (tabName === 'studio') loadStudios();
         }
 
         // ==================== PROFILE MANAGEMENT ====================
@@ -964,7 +1003,100 @@
                 showMessage(messageDiv, 'Lỗi: ' + error.message, 'error');
             }
         }
+        // ==================== STUDIO BOOKING ====================
+        async function loadStudios(){
+            const select = document.getElementById('studioSelect');
+            const msg = document.getElementById('studioMessage');
+            select.innerHTML = '<option value="">-- Đang tải danh sách studio... --</option>';
+             try {
+                const res = await fetch(`${API_BASE}/api/Studio`);
+                if (!res.ok) throw new Error('Không thể tải danh sách studio');
+                const studios = await res.json();
+                if (!Array.isArray(studios) || studios.length === 0) {
+                    select.innerHTML = '<option value="">-- Không có studio --</option>';
+                    return;
+                }
+                select.innerHTML = '<option value="">-- Chọn Studio --</option>' +
+                    studios.map(s => `<option value="${s.id}">${s.name} — ${s.location || ''}</option>`).join('');
+            } catch (err) {
+                showMessage(msg, 'Lỗi tải studio: ' + err.message, 'error');
+                select.innerHTML = '<option value="">-- Lỗi khi tải --</option>';
+            }
+        }
+         // studio file upload handlers (simple copy of existing upload behaviour)
+        const studioFileUpload = document.getElementById('studioFileUpload');
+        const studioAudioFile = document.getElementById('studioAudioFile');
+        if (studioFileUpload && studioAudioFile) {
+            studioFileUpload.addEventListener('click', () => studioAudioFile.click());
+            studioFileUpload.addEventListener('dragover', (e) => { e.preventDefault(); studioFileUpload.classList.add('active'); });
+            studioFileUpload.addEventListener('dragleave', () => studioFileUpload.classList.remove('active'));
+            studioFileUpload.addEventListener('drop', (e) => {
+                e.preventDefault();
+                studioFileUpload.classList.remove('active');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) studioAudioFile.files = files;
+            });
+            studioAudioFile.addEventListener('change', () => {
+                const fileName = studioAudioFile.files[0]?.name || 'Chọn tệp';
+                studioFileUpload.querySelector('.upload-text').textContent = '✓ ' + fileName;
+            });
+        }
+        async function submitStudioOrder() {
+            const msg = document.getElementById('studioMessage');
+            const studioId = document.getElementById('studioSelect').value;
+            const serviceType = document.getElementById('studioServiceType').value;
+            const date = document.getElementById('studioDate').value;
+            const time = document.getElementById('studioTime').value;
+            const notes = document.getElementById('studioNotes').value.trim();
+            const file = document.getElementById('studioAudioFile').files[0];
 
+            if (!studioId || !serviceType) {
+                showMessage(msg, 'Vui lòng chọn studio và loại dịch vụ', 'error');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('customer_id', currentCustomerId);
+                formData.append('studio_id', studioId);
+                formData.append('service_type', serviceType);
+                if (date) formData.append('date', date);
+                if (time) formData.append('time', time);
+                if (notes) formData.append('notes', notes);
+                if (file) formData.append('file', file);
+
+                msg.innerHTML = '<div class="loading"><div class="spinner"></div> Đang gửi đặt lịch...</div>';
+
+                // Reuse requests endpoint and attach studio_id; backend should accept this.
+                const res = await fetch(`${API_BASE}/requests`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!res.ok) throw new Error('Lỗi tạo đơn đặt studio');
+                const created = await res.json();
+                showMessage(msg, `✓ Đặt studio thành công (ID: ${created.id?.substring(0,8) || created.id})`, 'success');
+
+                // reset form
+                document.getElementById('studioSelect').value = '';
+                document.getElementById('studioServiceType').value = '';
+                document.getElementById('studioDate').value = '';
+                document.getElementById('studioTime').value = '';
+                document.getElementById('studioNotes').value = '';
+                if (studioAudioFile) {
+                    studioAudioFile.value = '';
+                    studioFileUpload.querySelector('.upload-text').textContent = 'Kéo thả tệp hoặc nhấp để chọn';
+                }
+
+                // refresh lists
+                setTimeout(() => {
+                    loadRequests();
+                    loadDashboard();
+                }, 1000);
+            } catch (err) {
+                showMessage(msg, 'Lỗi: ' + err.message, 'error');
+            }
+        }
         // ==================== DASHBOARD ====================
         async function loadDashboard() {
             try {
