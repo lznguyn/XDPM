@@ -1,4 +1,7 @@
 <?php
+// Cấu hình timezone UTC+7 (Vietnam Time)
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
 session_start();
 
 // Kiểm tra đăng nhập - chỉ cho phép chuyên gia (experts)
@@ -57,9 +60,18 @@ if (isset($_POST['update_schedule'])) {
         exit();
     }
     
+    // Đảm bảo date được format đúng (yyyy-MM-dd) và parse đúng timezone
+    // Nếu date đã là format yyyy-MM-dd thì giữ nguyên, nếu không thì parse lại
+    $dateObj = DateTime::createFromFormat('Y-m-d', $date);
+    if (!$dateObj) {
+        // Thử parse với format khác
+        $dateObj = new DateTime($date);
+    }
+    $dateFormatted = $dateObj->format('Y-m-d');
+    
     $requestData = [
         "specialistId" => intval($specialist_id),
-        "date" => $date,
+        "date" => $dateFormatted, // Gửi date đã được format đúng
         "timeSlot1" => $timeSlot1,
         "timeSlot2" => $timeSlot2,
         "timeSlot3" => $timeSlot3,
@@ -377,8 +389,10 @@ $mySchedule = $scheduleRes['body'] ?? [];
                     </div>
                     
                     <!-- Calendar -->
-                    <div id="calendar-container" class="grid grid-cols-7 gap-2 mb-6">
-                        <!-- Calendar sẽ được tạo bằng JavaScript -->
+                    <div class="overflow-x-auto mb-6">
+                        <div id="calendar-container" class="grid grid-cols-7 gap-2 min-w-full">
+                            <!-- Calendar sẽ được tạo bằng JavaScript -->
+                        </div>
                     </div>
                     
                     <!-- Debug info (remove in production) -->
@@ -498,7 +512,7 @@ $mySchedule = $scheduleRes['body'] ?? [];
             const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
             days.forEach(day => {
                 const header = document.createElement('div');
-                header.className = 'text-center font-semibold text-gray-700 py-2';
+                header.className = 'text-center font-semibold text-gray-700 py-2 bg-gray-50 rounded-lg';
                 header.textContent = day;
                 container.appendChild(header);
             });
@@ -510,31 +524,48 @@ $mySchedule = $scheduleRes['body'] ?? [];
             const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
             const today = new Date();
             
-            // Empty cells
+            // Empty cells for alignment
             for (let i = 0; i < firstDay; i++) {
-                container.appendChild(document.createElement('div'));
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'border rounded-lg p-2 bg-gray-50';
+                container.appendChild(emptyCell);
             }
             
             // Date cells
             for (let day = 1; day <= daysInMonth; day++) {
                 const date = new Date(currentYear, currentMonth, day);
-                // Fix timezone issue - set to local midnight
-                const localDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-                const dateStr = localDate.toISOString().split('T')[0];
-                const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                const todayStr = todayLocal.toISOString().split('T')[0];
+                // Format date theo local timezone (không dùng toISOString vì nó chuyển sang UTC)
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const dayStr = String(date.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${dayStr}`;
+                
+                // Format today theo local timezone
+                const todayYear = today.getFullYear();
+                const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
+                const todayDay = String(today.getDate()).padStart(2, '0');
+                const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
+                
                 const isToday = dateStr === todayStr;
                 const isPast = dateStr < todayStr;
                 
-                // Format date để match với API response (có thể là Date object hoặc string)
+                // Format date để match với API response (API trả về format yyyy-MM-dd)
                 const schedule = mySchedule.find(s => {
                     const sDate = s.date;
                     if (typeof sDate === 'string') {
+                        // API trả về format yyyy-MM-dd, so sánh trực tiếp
                         return sDate === dateStr || sDate.split('T')[0] === dateStr;
                     }
-                    // Nếu là Date object từ API
-                    const sDateStr = new Date(sDate).toISOString().split('T')[0];
-                    return sDateStr === dateStr;
+                    // Nếu là Date object từ API, format theo local timezone
+                    if (sDate instanceof Date || (typeof sDate === 'object' && sDate.getFullYear)) {
+                        const d = new Date(sDate);
+                        const sYear = d.getFullYear();
+                        const sMonth = String(d.getMonth() + 1).padStart(2, '0');
+                        const sDay = String(d.getDate()).padStart(2, '0');
+                        const sDateStr = `${sYear}-${sMonth}-${sDay}`;
+                        return sDateStr === dateStr;
+                    }
+                    return false;
                 });
                 
                 const bookedSlots = schedule && schedule.timeSlots ? [
@@ -545,10 +576,10 @@ $mySchedule = $scheduleRes['body'] ?? [];
                 ].filter(Boolean).length : 0;
                 
                 const cell = document.createElement('div');
-                cell.className = `border rounded-lg p-2 transition ${isPast ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-purple-50'} ${isToday ? 'border-purple-500 bg-purple-50' : ''} ${selectedDate === dateStr ? 'bg-purple-200 border-purple-600' : ''}`;
+                cell.className = `border rounded-lg p-2 min-h-[80px] transition ${isPast ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:bg-purple-50 bg-white'} ${isToday ? 'border-purple-500 bg-purple-50' : ''} ${selectedDate === dateStr ? 'bg-purple-200 border-purple-600 ring-2 ring-purple-300' : ''}`;
                 cell.innerHTML = `
-                    <div class="text-center font-medium ${isToday ? 'text-purple-600' : ''}">${day}</div>
-                    <div class="text-xs text-gray-600 mt-1">${bookedSlots}/4 ca</div>
+                    <div class="text-center font-medium ${isToday ? 'text-purple-600' : 'text-gray-900'} mb-1">${day}</div>
+                    <div class="text-xs text-gray-600 text-center">${bookedSlots}/4 ca</div>
                 `;
                 
                 if (!isPast) {
@@ -578,10 +609,12 @@ $mySchedule = $scheduleRes['body'] ?? [];
             }
             
             dateInput.value = dateStr;
-            const dateObj = new Date(dateStr + 'T00:00:00');
+            // Parse date string theo local timezone (không dùng T00:00:00 vì có thể bị lệch timezone)
+            const [year, month, day] = dateStr.split('-').map(Number);
+            const dateObj = new Date(year, month - 1, day);
             const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
             const dayName = dayNames[dateObj.getDay()];
-            dateTitle.textContent = `Lịch ${dayName}, ${dateObj.toLocaleDateString('vi-VN')}`;
+            dateTitle.textContent = `Lịch ${dayName}, ${day}/${month}/${year}`;
             
             // Update checkboxes
             const checkboxes = document.querySelectorAll('.schedule-checkbox');

@@ -1,4 +1,7 @@
 <?php
+// Cấu hình timezone UTC+7 (Vietnam Time)
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
 // Bắt đầu session và lấy thông tin user từ session JWT
 session_start();
 
@@ -30,8 +33,8 @@ $role = $_SESSION['user']['role'] ?? 'Admin';
 
             <!-- Logo -->
             <a href="admin_page.php" class="flex items-center space-x-2 text-2xl font-bold text-primary">
-                <i class="fas fa-laptop-code text-primary"></i>
-                <span>Admin<span class="text-secondary">LAPTOP</span></span>
+                <i class="fas fa-music text-primary"></i>
+                <span>ADMIN <span class="text-secondary">MUTRAPRO</span></span>
             </a>
 
             <!-- Navigation -->

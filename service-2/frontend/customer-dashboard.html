@@ -69,6 +69,116 @@
         background: #ff5252;
       }
 
+      /* Notifications */
+      .notification-container {
+        position: relative;
+        margin-right: 15px;
+      }
+
+      .notification-icon {
+        position: relative;
+        background: #f0f0f0;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 20px;
+        transition: all 0.3s;
+      }
+
+      .notification-icon:hover {
+        background: #e0e0e0;
+      }
+
+      .notification-badge {
+        position: absolute;
+        top: -5px;
+        right: -5px;
+        background: #ff4444;
+        color: white;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: bold;
+      }
+
+      .notification-dropdown {
+        position: absolute;
+        top: 100%;
+        right: 0;
+        margin-top: 10px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        width: 400px;
+        max-height: 500px;
+        overflow-y: auto;
+        z-index: 1000;
+        display: none;
+      }
+
+      .notification-dropdown.show {
+        display: block;
+      }
+
+      .notification-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .notification-header h3 {
+        margin: 0;
+        font-size: 16px;
+        color: #333;
+      }
+
+      .notification-item {
+        padding: 15px 20px;
+        border-bottom: 1px solid #f0f0f0;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .notification-item:hover {
+        background: #f8f8f8;
+      }
+
+      .notification-item.unread {
+        background: #f0f7ff;
+        font-weight: 500;
+      }
+
+      .notification-item-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
+      }
+
+      .notification-item-message {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 5px;
+      }
+
+      .notification-item-time {
+        font-size: 11px;
+        color: #999;
+      }
+
+      .notification-empty {
+        padding: 40px 20px;
+        text-align: center;
+        color: #999;
+      }
+
       /* Tabs Navigation */
       .tabs-container {
         display: flex;
@@ -545,8 +655,6 @@
           width: 100%;
         }
 
-<<<<<<< HEAD
-=======
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
@@ -697,7 +805,6 @@
         }
 
         /* Stats Grid */
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
         .stats-grid {
           grid-template-columns: 1fr;
         }
@@ -742,7 +849,25 @@
       <!-- Header -->
       <div class="header">
         <h1>🎵 MuTraPro Dashboard</h1>
-        <div class="header-info">
+        <div class="header-info" style="display: flex; align-items: center; gap: 15px;">
+          <!-- Notifications -->
+          <div class="notification-container">
+            <button class="notification-icon" onclick="toggleNotifications()" id="notificationBtn">
+              🔔
+              <span class="notification-badge" id="notificationBadge" style="display: none;">0</span>
+            </button>
+            <div class="notification-dropdown" id="notificationDropdown">
+              <div class="notification-header">
+                <h3>Thông báo</h3>
+                <button onclick="markAllAsRead()" style="background: none; border: none; color: #667eea; cursor: pointer; font-size: 12px;">
+                  Đánh dấu tất cả đã đọc
+                </button>
+              </div>
+              <div id="notificationList">
+                <div class="notification-empty">Đang tải...</div>
+              </div>
+            </div>
+          </div>
           <div class="customer-name" id="customerNameDisplay">Khách hàng</div>
           <button class="logout-btn" onclick="logout()">Đăng Xuất</button>
         </div>
@@ -768,8 +893,8 @@
         <button class="tab-button" onclick="switchTab('feedback')">
           💬 Yêu Cầu Chỉnh Sửa
         </button>
-        <button class="tab-button" onclick="switchTab('studio')">
-          💬 Đặt Lịch CÙng Studio
+        <button class="tab-button" onclick="switchTab('studios')">
+          🎙️ Đặt Studio
         </button>
         <button class="tab-button" onclick="window.location.href='index.html'">
           🏠 Trang Chủ
@@ -804,7 +929,6 @@
           </div>
         </div>
 
-<<<<<<< HEAD
         <div class="form-row">
           <div class="form-group">
             <label>Điện Thoại</label>
@@ -818,20 +942,6 @@
             <label>Địa Chỉ</label>
             <input type="text" id="profileAddress" placeholder="Nhập địa chỉ" />
           </div>
-=======
-        <!-- Tabs Navigation -->
-        <div class="tabs-container">
-            <button class="tab-button active" onclick="switchTab('dashboard', event)">📊 Bảng Điều Khiển</button>
-            <button class="tab-button" onclick="switchTab('profile', event)">👤 Hồ Sơ Khách Hàng</button>
-            <button class="tab-button" onclick="switchTab('upload', event)">📁 Tạo Yêu Cầu</button>
-            <button class="tab-button" onclick="switchTab('studios', event)">🎙️ Đặt Studio</button>
-            <button class="tab-button" onclick="switchTab('tracking', event)">📋 Theo Dõi Đơn</button>
-            <button class="tab-button" onclick="switchTab('history', event)">📚 Lịch Sử</button>
-            <button class="tab-button" onclick="switchTab('payments', event)">💰 Thanh Toán</button>
-            <button class="tab-button" onclick="switchTab('feedback', event)">💬 Yêu Cầu Chỉnh Sửa</button>
-            <button class="tab-button" onclick="window.location.href='index.html'">🏠 Trang Chủ</button>
-
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
         </div>
 
         <div style="display: flex; gap: 10px">
@@ -879,188 +989,29 @@
           ></textarea>
         </div>
 
-<<<<<<< HEAD
         <button
           class="btn btn-primary"
           onclick="submitRequest()"
-          style="width: 100%"
+          style="width: 100%; margin-top: 20px;"
         >
-          🚀 Gửi Yêu Cầu
-        </button>
-      </div>
-      <!--- Studio --->
-      <div id="studio" class="tab-content">
-        <h2>🏢 Đặt Studio</h2>
-        +
-        <div id="studioMessage"></div>
-        + +
-        <div class="form-group">
-          + <label>Chọn Studio *</label> +
-          <select id="studioSelect">
-            +
-            <option value="">-- Đang tải danh sách studio... --</option>
-            +
-          </select>
-          +
-        </div>
-
-        <div class="form-group">
-          + <label>Loại Dịch Vụ *</label> +
-          <select id="studioServiceType">
-            +
-            <option value="">-- Chọn Loại Dịch Vụ --</option>
-            +
-            <option value="recording">🎙️ Thu Âm</option>
-            +
-            <option value="mixing">🎚️ Mix & Master</option>
-            +
-            <option value="rehearsal">🎧 Thu Thử / Tập</option>
-            +
-          </select>
-          +
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            + <label>Ngày Dự Kiến</label> +
-            <input type="date" id="studioDate" /> +
-          </div>
-          +
-          <div class="form-group">
-            + <label>Thời Gian</label> + <input type="time" id="studioTime" /> +
-          </div>
-          +
-=======
-        <!-- Tracking Tab -->
-        <div id="tracking" class="tab-content">
-            <h2>📋 Theo Dõi Đơn Hàng</h2>
-            <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Hiển thị các đơn hàng đang được xử lý và chưa hoàn thành</p>
-            <div id="trackingMessage"></div>
-            <div id="requestsList"></div>
-        </div>
-
-        <!-- History Tab -->
-        <div id="history" class="tab-content">
-            <h2>📚 Lịch Sử Đơn Hàng</h2>
-            <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Hiển thị các đơn hàng đã hoàn thành và đã thanh toán, hoặc đã bị hủy</p>
-            <div id="historyMessage"></div>
-            <div id="historyList"></div>
-        </div>
-
-        <!-- Payments Tab -->
-        <div id="payments" class="tab-content">
-            <h2>💰 Quản Lý Thanh Toán</h2>
-            <div id="paymentsMessage"></div>
-            
-            <!-- Payment Stats -->
-            <div class="stats-grid" id="paymentStats"></div>
-
-            <!-- Unpaid Requests -->
-            <h3 style="margin-top: 30px; margin-bottom: 20px;">Các Đơn Chưa Thanh Toán</h3>
-            <div id="unpaidRequests"></div>
-
-            <!-- Transactions -->
-            <h3 style="margin-top: 30px; margin-bottom: 20px;">Lịch Sử Giao Dịch</h3>
-            <div class="table-responsive">
-                <table id="transactionsTable">
-                    <thead>
-                        <tr>
-                            <th>Ngày Giao Dịch</th>
-                            <th>Mã Thanh Toán</th>
-                            <th>Liên Kết Đơn</th>
-                            <th>Số Tiền</th>
-                            <th>Trạng Thái</th>
-                        </tr>
-                    </thead>
-                    <tbody id="transactionsBody">
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Studios Tab -->
-        <div id="studios" class="tab-content">
-            <h2>🎙️ Đặt Phòng Thu Âm</h2>
-            <div id="studiosMessage"></div>
-            
-            <!-- Studio List -->
-            <div id="studiosList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
-                <!-- Studios will be loaded here -->
-            </div>
-
-            <!-- Booking Modal -->
-            <div id="bookingModal" class="modal">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h2 class="modal-title">📅 Đặt Phòng Thu</h2>
-                        <button class="modal-close" onclick="closeBookingModal()">✕</button>
-                    </div>
-                    <div id="bookingModalBody">
-                        <!-- Booking form will be inserted here -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Feedback Tab -->
-        <div id="feedback" class="tab-content">
-            <h2>💬 Yêu Cầu Chỉnh Sửa & Phản Hồi</h2>
-            <div id="feedbackMessage"></div>
-
-            <div class="form-group">
-                <label>Chọn Đơn Hàng *</label>
-                <select id="feedbackRequestId">
-                    <option value="">-- Chọn Đơn Hàng --</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label>Nội Dung Chỉnh Sửa / Phản Hồi *</label>
-                <textarea id="feedbackContent" placeholder="Mô tả chi tiết những chỉnh sửa bạn muốn..."></textarea>
-            </div>
-
-            <div class="form-group">
-                <label>Loại Phản Hồi *</label>
-                <select id="feedbackType">
-                    <option value="">-- Chọn Loại --</option>
-                    <option value="revision">✏️ Yêu Cầu Chỉnh Sửa</option>
-                    <option value="bug">🐛 Báo Lỗi</option>
-                    <option value="suggestion">💡 Đề Xuất</option>
-                </select>
-            </div>
-
-            <button class="btn btn-primary" onclick="submitFeedback()" style="width: 100%;">
-                📤 Gửi Phản Hồi
-            </button>
-
-            <!-- Previous Feedback -->
-            <h3 style="margin-top: 30px; margin-bottom: 20px;">Phản Hồi Trước Đó</h3>
-            <div id="feedbackHistory"></div>
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
-        </div>
-        <div class="form-group">
-          + <label>Ghi chú</label> +
-          <textarea
-            id="studioNotes"
-            placeholder="Mô tả yêu cầu cho studio..."
-          ></textarea>
-          +
-        </div>
-        +
-        <button
-          class="btn btn-primary"
-          onclick="submitStudioOrder()"
-          style="width: 100%"
-        >
-          📅 Đặt Studio
+          📤 Gửi Yêu Cầu
         </button>
       </div>
 
       <!-- Tracking Tab -->
       <div id="tracking" class="tab-content">
         <h2>📋 Theo Dõi Đơn Hàng</h2>
+        <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Hiển thị các đơn hàng đang được xử lý và chưa hoàn thành</p>
         <div id="trackingMessage"></div>
         <div id="requestsList"></div>
+      </div>
+
+      <!-- History Tab -->
+      <div id="history" class="tab-content">
+        <h2>📚 Lịch Sử Đơn Hàng</h2>
+        <p style="color: #666; margin-bottom: 20px; font-size: 14px;">Hiển thị các đơn hàng đã hoàn thành và đã thanh toán, hoặc đã bị hủy</p>
+        <div id="historyMessage"></div>
+        <div id="historyList"></div>
       </div>
 
       <!-- Payments Tab -->
@@ -1092,6 +1043,30 @@
             </thead>
             <tbody id="transactionsBody"></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Studios Tab -->
+      <div id="studios" class="tab-content">
+        <h2>🎙️ Đặt Phòng Thu Âm</h2>
+        <div id="studiosMessage"></div>
+        
+        <!-- Studio List -->
+        <div id="studiosList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+          <!-- Studios will be loaded here -->
+        </div>
+
+        <!-- Booking Modal -->
+        <div id="bookingModal" class="modal">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2 class="modal-title">📅 Đặt Phòng Thu</h2>
+              <button class="modal-close" onclick="closeBookingModal()">✕</button>
+            </div>
+            <div id="bookingModalBody">
+              <!-- Booking form will be inserted here -->
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1162,12 +1137,81 @@
     </div>
 
     <script>
-<<<<<<< HEAD
-      // Configuration - Use Kong Gateway
-      const API_BASE = "http://localhost:8000";
-=======
         // Configuration - Use Kong Gateway
         const API_BASE = 'http://localhost:8000';
+        
+        // ============================================================================
+        // Timezone Helper Functions (UTC+7 - Vietnam Time)
+        // ============================================================================
+        /**
+         * Format date theo timezone UTC+7 (Vietnam Time)
+         * @param {string|Date} dateInput - Date string hoặc Date object
+         * @param {string} format - Format type: 'date', 'datetime', 'time'
+         * @returns {string} Formatted date string
+         */
+        function formatVietnamDate(dateInput, format = 'date') {
+            if (!dateInput) return 'N/A';
+            
+            let date;
+            if (dateInput instanceof Date) {
+                date = dateInput;
+            } else {
+                // Parse date string (có thể là UTC hoặc local)
+                date = new Date(dateInput);
+            }
+            
+            // Chuyển đổi sang timezone UTC+7
+            // JavaScript Date object luôn lưu trữ theo UTC, nhưng hiển thị theo local timezone
+            // Để đảm bảo hiển thị đúng UTC+7, ta cần adjust offset
+            const utcTime = date.getTime() + (date.getTimezoneOffset() * 60000);
+            const vietnamTime = new Date(utcTime + (7 * 3600000)); // UTC+7 = +7 hours
+            
+            const options = {
+                timeZone: 'Asia/Ho_Chi_Minh',
+                ...(format === 'date' ? {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                } : format === 'datetime' ? {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                } : {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                })
+            };
+            
+            try {
+                return vietnamTime.toLocaleString('vi-VN', options);
+            } catch (e) {
+                // Fallback nếu timezone không được hỗ trợ
+                const year = vietnamTime.getFullYear();
+                const month = String(vietnamTime.getMonth() + 1).padStart(2, '0');
+                const day = String(vietnamTime.getDate()).padStart(2, '0');
+                
+                if (format === 'date') {
+                    return `${day}/${month}/${year}`;
+                } else if (format === 'datetime') {
+                    const hours = String(vietnamTime.getHours()).padStart(2, '0');
+                    const minutes = String(vietnamTime.getMinutes()).padStart(2, '0');
+                    return `${day}/${month}/${year} ${hours}:${minutes}`;
+                }
+                return `${day}/${month}/${year}`;
+            }
+        }
+        
+        /**
+         * Lấy thời gian hiện tại theo UTC+7
+         */
+        function getVietnamNow() {
+            const now = new Date();
+            const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+            return new Date(utcTime + (7 * 3600000));
+        }
         
         // Cache để lưu giá dịch vụ
         let servicePricesCache = {
@@ -1202,6 +1246,165 @@
         
         // Refresh giá mỗi 5 phút
         setInterval(loadServicePrices, 5 * 60 * 1000);
+
+        // ============================================================================
+        // NOTIFICATIONS SYSTEM
+        // ============================================================================
+        let notifications = [];
+        let notificationPollInterval = null;
+
+        // Load notifications
+        async function loadNotifications() {
+            try {
+                const response = await fetch(`${API_BASE}/api/Notification/customer/${currentCustomerId}`);
+                if (response.ok) {
+                    notifications = await response.json();
+                    renderNotifications();
+                    updateNotificationBadge();
+                } else {
+                    console.error('Error loading notifications:', response.status);
+                }
+            } catch (error) {
+                console.error('Error loading notifications:', error);
+            }
+        }
+
+        // Get unread count
+        async function getUnreadCount() {
+            try {
+                const response = await fetch(`${API_BASE}/api/Notification/customer/${currentCustomerId}/unread-count`);
+                if (response.ok) {
+                    const data = await response.json();
+                    return data.count || 0;
+                }
+            } catch (error) {
+                console.error('Error getting unread count:', error);
+            }
+            return 0;
+        }
+
+        // Render notifications
+        function renderNotifications() {
+            const list = document.getElementById('notificationList');
+            if (!list) return;
+
+            if (notifications.length === 0) {
+                list.innerHTML = '<div class="notification-empty">Không có thông báo nào</div>';
+                return;
+            }
+
+            list.innerHTML = notifications.map(notif => {
+                const typeIcon = {
+                    'Info': 'ℹ️',
+                    'Success': '✅',
+                    'Warning': '⚠️',
+                    'Error': '❌',
+                    'StatusChange': '🔄'
+                }[notif.type] || '📢';
+
+                return `
+                    <div class="notification-item ${notif.isRead ? '' : 'unread'}" onclick="markAsRead(${notif.id})">
+                        <div class="notification-item-title">${typeIcon} ${notif.title}</div>
+                        <div class="notification-item-message">${notif.message}</div>
+                        <div class="notification-item-time">${formatVietnamDate(notif.createdAt, 'datetime')}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Update notification badge
+        async function updateNotificationBadge() {
+            const badge = document.getElementById('notificationBadge');
+            if (!badge) return;
+
+            const count = await getUnreadCount();
+            if (count > 0) {
+                badge.textContent = count > 99 ? '99+' : count;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Toggle notifications dropdown
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notificationDropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('show');
+                if (dropdown.classList.contains('show')) {
+                    loadNotifications();
+                }
+            }
+        }
+
+        // Mark notification as read
+        async function markAsRead(notificationId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/Notification/${notificationId}/read`, {
+                    method: 'PATCH'
+                });
+                if (response.ok) {
+                    // Update local state
+                    const notif = notifications.find(n => n.id === notificationId);
+                    if (notif) {
+                        notif.isRead = true;
+                        renderNotifications();
+                        updateNotificationBadge();
+                    }
+                }
+            } catch (error) {
+                console.error('Error marking notification as read:', error);
+            }
+        }
+
+        // Mark all as read
+        async function markAllAsRead() {
+            try {
+                const response = await fetch(`${API_BASE}/api/Notification/customer/${currentCustomerId}/read-all`, {
+                    method: 'PATCH'
+                });
+                if (response.ok) {
+                    // Update local state
+                    notifications.forEach(n => {
+                        n.isRead = true;
+                    });
+                    renderNotifications();
+                    updateNotificationBadge();
+                }
+            } catch (error) {
+                console.error('Error marking all as read:', error);
+            }
+        }
+
+        // Start polling for new notifications
+        function startNotificationPolling() {
+            // Load immediately
+            loadNotifications();
+            updateNotificationBadge();
+            
+            // Poll every 30 seconds
+            notificationPollInterval = setInterval(() => {
+                loadNotifications();
+                updateNotificationBadge();
+            }, 30000);
+        }
+
+        // Stop polling
+        function stopNotificationPolling() {
+            if (notificationPollInterval) {
+                clearInterval(notificationPollInterval);
+                notificationPollInterval = null;
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const container = document.querySelector('.notification-container');
+            const dropdown = document.getElementById('notificationDropdown');
+            if (container && dropdown && !container.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
         
         // Get URL parameters (from service-1 login redirect)
         const urlParams = new URLSearchParams(window.location.search);
@@ -1224,33 +1427,6 @@
         
         let currentCustomerId = localStorage.getItem('customerId');
         let currentCustomerName = localStorage.getItem('customerName');
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
-
-      // Get URL parameters (from service-1 login redirect)
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlCustomerId = urlParams.get("customerId");
-      const urlToken = urlParams.get("token");
-      const urlName = urlParams.get("name");
-
-      // Save URL parameters to localStorage if provided (from service-1 login)
-      if (urlCustomerId) {
-        localStorage.setItem("customerId", urlCustomerId);
-        if (urlName) {
-          localStorage.setItem("customerName", urlName);
-        }
-        if (urlToken) {
-          localStorage.setItem("token", urlToken);
-        }
-        // Clean URL by removing parameters
-        window.history.replaceState(
-          {},
-          document.title,
-          window.location.pathname
-        );
-      }
-
-      let currentCustomerId = localStorage.getItem("customerId");
-      let currentCustomerName = localStorage.getItem("customerName");
 
       // Initialize
       document.addEventListener("DOMContentLoaded", function () {
@@ -1265,6 +1441,7 @@
           updateCustomerDisplay();
           loadProfile();
           loadDashboard();
+          startNotificationPolling();
         }
       }
 
@@ -1282,152 +1459,46 @@
       }
 
       // ==================== TAB SWITCHING ====================
-      function switchTab(tabName) {
+      function switchTab(tabName, event) {
         // Hide all tabs
-        document.querySelectorAll(".tab-content").forEach((tab) => {
-          tab.classList.remove("active");
+        document.querySelectorAll('.tab-content').forEach(tab => {
+          tab.classList.remove('active');
         });
 
-<<<<<<< HEAD
         // Deactivate all buttons
-        document.querySelectorAll(".tab-button").forEach((btn) => {
-          btn.classList.remove("active");
-=======
-        function initializeApp() {
-            if (!currentCustomerId) {
-                // Redirect to auth page
-                window.location.href = 'auth.html';
-            } else {
-                updateCustomerDisplay();
-                loadProfile();
-                loadDashboard();
-            }
-        }
-
-        // ==================== LOGIN FLOW ====================
-        function logout() {
-            localStorage.removeItem('customerId');
-            localStorage.removeItem('customerName');
-            localStorage.removeItem('token');
-            window.location.href = 'auth.html';
-        }
-
-        function updateCustomerDisplay() {
-            document.getElementById('customerNameDisplay').textContent = currentCustomerName || 'Khách hàng';
-        }
-
-        // ==================== TAB SWITCHING ====================
-        function switchTab(tabName, event) {
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-
-            // Deactivate all buttons
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-
-            // Show selected tab
-            const targetTab = document.getElementById(tabName);
-            if (!targetTab) {
-                console.error('Tab not found:', tabName);
-                return;
-            }
-            targetTab.classList.add('active');
-
-            // Activate selected button - find button by onclick attribute or use event
-            if (event && event.target) {
-                event.target.classList.add('active');
-            } else {
-                // Find button by looking for the one that calls switchTab with this tabName
-                const buttons = document.querySelectorAll('.tab-button');
-                buttons.forEach(btn => {
-                    const onclick = btn.getAttribute('onclick');
-                    if (onclick && onclick.includes(`switchTab('${tabName}')`)) {
-                        btn.classList.add('active');
-                    }
-                });
-            }
-
-            // Load data for specific tabs
-            if (tabName === 'dashboard') loadDashboard();
-            if (tabName === 'tracking') loadRequests();
-            if (tabName === 'history') loadHistory();
-            if (tabName === 'payments') loadPayments();
-            if (tabName === 'feedback') loadFeedback();
-            if (tabName === 'studios') loadStudios();
-        }
-
-        // ==================== PROFILE MANAGEMENT ====================
-        async function loadProfile() {
-            try {
-                const response = await fetch(`${API_BASE}/customers/${currentCustomerId}`);
-                if (!response.ok) return;
-
-                const customer = await response.json();
-                document.getElementById('profileName').value = customer.name || '';
-                document.getElementById('profileEmail').value = customer.email || '';
-                document.getElementById('profilePhone').value = customer.phone || '';
-                document.getElementById('profileAddress').value = customer.address || '';
-            } catch (error) {
-                console.error('Error loading profile:', error);
-            }
-        }
-
-        async function saveProfile() {
-            const name = document.getElementById('profileName').value.trim();
-            const email = document.getElementById('profileEmail').value.trim();
-            const phone = document.getElementById('profilePhone').value.trim();
-            const address = document.getElementById('profileAddress').value.trim();
-            const messageDiv = document.getElementById('profileMessage');
-
-            if (!name || !email) {
-                showMessage(messageDiv, 'Vui lòng nhập tên và email', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/customers/${currentCustomerId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, phone, address })
-                });
-
-                if (!response.ok) throw new Error('Lỗi cập nhật hồ sơ');
-
-                showMessage(messageDiv, '✓ Hồ sơ đã được lưu thành công', 'success');
-                localStorage.setItem('customerName', name);
-                updateCustomerDisplay();
-            } catch (error) {
-                showMessage(messageDiv, 'Lỗi: ' + error.message, 'error');
-            }
-        }
-
-        // ==================== FILE UPLOAD ====================
-        const fileUpload = document.getElementById('fileUpload');
-        const audioFileInput = document.getElementById('audioFile');
-
-        fileUpload.addEventListener('click', () => audioFileInput.click());
-        
-        fileUpload.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            fileUpload.classList.add('active');
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
+        document.querySelectorAll('.tab-button').forEach(btn => {
+          btn.classList.remove('active');
         });
 
         // Show selected tab
-        document.getElementById(tabName).classList.add("active");
+        const targetTab = document.getElementById(tabName);
+        if (!targetTab) {
+          console.error('Tab not found:', tabName);
+          return;
+        }
+        targetTab.classList.add('active');
 
-        // Activate selected button
-        event.target.classList.add("active");
+        // Activate selected button - find button by onclick attribute or use event
+        if (event && event.target) {
+          event.target.classList.add('active');
+        } else {
+          // Find button by looking for the one that calls switchTab with this tabName
+          const buttons = document.querySelectorAll('.tab-button');
+          buttons.forEach(btn => {
+            const onclick = btn.getAttribute('onclick');
+            if (onclick && onclick.includes(`switchTab('${tabName}')`) || onclick && onclick.includes(`switchTab("${tabName}")`)) {
+              btn.classList.add('active');
+            }
+          });
+        }
 
         // Load data for specific tabs
-        if (tabName === "dashboard") loadDashboard();
-        if (tabName === "tracking") loadRequests();
-        if (tabName === "payments") loadPayments();
-        if (tabName === "feedback") loadFeedback();
-        if (tabName === "studio") loadStudios();
+        if (tabName === 'dashboard') loadDashboard();
+        if (tabName === 'tracking') loadRequests();
+        if (tabName === 'history') loadHistory();
+        if (tabName === 'payments') loadPayments();
+        if (tabName === 'feedback') loadFeedback();
+        if (tabName === 'studios') loadStudios();
       }
 
       // ==================== PROFILE MANAGEMENT ====================
@@ -1471,28 +1542,7 @@
             }
           );
 
-<<<<<<< HEAD
           if (!response.ok) throw new Error("Lỗi cập nhật hồ sơ");
-=======
-                // Calculate stats
-                const stats = {
-                    total: requests.length,
-                    completed: requests.filter(r => {
-                        const s = (r.status || '').toLowerCase();
-                        return s === 'completed' || s === 'finished';
-                    }).length,
-                    processing: requests.filter(r => {
-                        const s = (r.status || '').toLowerCase();
-                        return s === 'pendingreview' || s === 'pending_review' || 
-                               s === 'pendingmeetingconfirmation' || s === 'pending_meeting_confirmation' ||
-                               s === 'processing' || s === 'inprogress' || s === 'in_progress';
-                    }).length,
-                    pending: requests.filter(r => {
-                        const s = (r.status || '').toLowerCase();
-                        return s === 'requested' || s === 'pending' || s === 'submitted';
-                    }).length
-                };
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
 
           showMessage(messageDiv, "✓ Hồ sơ đã được lưu thành công", "success");
           localStorage.setItem("customerName", name);
@@ -1550,10 +1600,9 @@
           formData.append("service_type", serviceType);
           formData.append(
             "title",
-            `${serviceType.toUpperCase()} - ${new Date().toLocaleDateString(
-              "vi-VN"
-            )}`
+            `${serviceType.toUpperCase()} - ${formatVietnamDate(getVietnamNow())}`
           );
+          formData.append("status", "pending"); // Đặt trạng thái mặc định là pending
           formData.append("file", file);
           if (description) formData.append("description", description);
 
@@ -1723,13 +1772,24 @@
             ? await requestsResponse.json()
             : [];
 
-          // Calculate stats
+          // Calculate stats - loại bỏ đơn bị hủy
+          const validRequests = requests.filter(r => !isRequestCancelled(r));
           const stats = {
-            total: requests.length,
-            completed: requests.filter((r) => r.status === "completed").length,
-            processing: requests.filter((r) => r.status === "processing")
-              .length,
-            pending: requests.filter((r) => r.status === "pending").length,
+            total: validRequests.length,
+            completed: validRequests.filter((r) => {
+              const s = (r.status || '').toLowerCase();
+              return s === 'completed' || s === 'finished';
+            }).length,
+            processing: validRequests.filter((r) => {
+              const s = (r.status || '').toLowerCase();
+              return s === 'pendingreview' || s === 'pending_review' || 
+                     s === 'pendingmeetingconfirmation' || s === 'pending_meeting_confirmation' ||
+                     s === 'processing' || s === 'inprogress' || s === 'in_progress';
+            }).length,
+            pending: validRequests.filter((r) => {
+              const s = (r.status || '').toLowerCase();
+              return s === 'requested' || s === 'pending' || s === 'submitted';
+            }).length,
           };
 
           // Display stats
@@ -1753,13 +1813,14 @@
                     </div>
                 `;
 
-          // Display recent requests
+          // Display recent requests - loại bỏ đơn bị hủy
           const recentRequests = document.getElementById("recentRequests");
-          if (requests.length === 0) {
+          const recentValidRequests = validRequests.filter(r => !isRequestCancelled(r));
+          if (recentValidRequests.length === 0) {
             recentRequests.innerHTML =
               '<p style="text-align: center; color: #999; padding: 20px;">Chưa có đơn hàng nào</p>';
           } else {
-            recentRequests.innerHTML = requests
+            recentRequests.innerHTML = recentValidRequests
               .slice(0, 5)
               .map(
                 (req) => `
@@ -1772,9 +1833,7 @@
                                           0,
                                           8
                                         )}</span>
-                                        <span>${new Date(
-                                          req.created_at
-                                        ).toLocaleDateString("vi-VN")}</span>
+                                        <span>${formatVietnamDate(req.created_at)}</span>
                                     </div>
                                 </div>
                                 <span class="badge badge-${
@@ -1796,15 +1855,6 @@
         }
       }
 
-<<<<<<< HEAD
-      // ==================== REQUEST TRACKING ====================
-      async function loadRequests() {
-        try {
-          const response = await fetch(
-            `${API_BASE}/requests/customer/${currentCustomerId}`
-          );
-          const requests = (await response.ok) ? await response.json() : [];
-=======
         // ==================== REQUEST TRACKING ====================
         async function loadRequests() {
             try {
@@ -1816,30 +1866,16 @@
                     const status = (req.status || req.Status || '').toLowerCase();
                     const paid = isRequestPaid(req);
                     const completed = status === 'completed' || status === 'finished';
-                    const cancelled = status === 'cancelled' || status === 'canceled';
-                    const rejectedByExpert = status === 'rejectedbyexpert' || status === 'rejected_by_expert';
+                    const cancelled = isRequestCancelled(req);
                     
                     // Loại bỏ đơn đã hoàn thành và đã thanh toán, hoặc đơn đã bị hủy
                     // Chỉ hiển thị đơn đang xử lý (chưa hoàn thành hoặc chưa thanh toán) và chưa bị hủy
-                    // RejectedByExpert vẫn hiển thị để người dùng biết
                     return !(completed && paid) && !cancelled;
                 });
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
 
           const messageDiv = document.getElementById("trackingMessage");
           const requestsList = document.getElementById("requestsList");
 
-<<<<<<< HEAD
-          if (requests.length === 0) {
-            requestsList.innerHTML =
-              '<p style="text-align: center; color: #999; padding: 20px;">Chưa có đơn hàng nào</p>';
-            return;
-          }
-
-          requestsList.innerHTML = requests
-            .map(
-              (req) => `
-=======
                 if (requests.length === 0) {
                     requestsList.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Không có đơn hàng nào đang xử lý</p>';
                     return;
@@ -1850,62 +1886,15 @@
                     const status = req.status || req.Status || 'pending';
                     const paid = isRequestPaid(req);
                     return `
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
                     <div class="card">
                         <div class="card-header">
                             <div>
                                 <div class="card-title">
-<<<<<<< HEAD
-                                    ${getServiceIcon(
-                                      req.service_type
-                                    )} ${req.service_type.toUpperCase()}
-                                </div>
-                                <div class="card-meta">
-                                    <span>ID: ${req.id}</span>
-                                    <span>Tạo: ${new Date(
-                                      req.created_at
-                                    ).toLocaleDateString("vi-VN")}</span>
-                                </div>
-                            </div>
-                            <span class="badge badge-${
-                              req.status
-                            }">${translateStatus(req.status)}</span>
-                        </div>
-                        
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: ${getProgressWidth(
-                              req.status
-                            )}%"></div>
-                        </div>
-                        
-                        ${
-                          req.description
-                            ? `<p style="margin-top: 10px; color: #666; font-size: 14px;">📝 ${req.description}</p>`
-                            : ""
-                        }
-                        
-                        <div style="display: flex; gap: 10px; margin-top: 15px;">
-                            <button class="btn btn-secondary" onclick="viewRequestDetails('${
-                              req.id
-                            }')">Xem Chi Tiết</button>
-                            ${
-                              req.status === "pending"
-                                ? `<button class="btn btn-danger" onclick="cancelRequest('${req.id}')">Hủy Yêu Cầu</button>`
-                                : ""
-                            }
-                        </div>
-                    </div>
-                `
-            )
-            .join("");
-        } catch (error) {
-          console.error("Error loading requests:", error);
-=======
                                     ${getServiceIcon(serviceType)} ${serviceType.toUpperCase()}
                                 </div>
                                 <div class="card-meta">
                                     <span>ID: ${req.id}</span>
-                                    <span>Tạo: ${new Date(req.created_date || req.created_at || req.CreatedDate).toLocaleDateString('vi-VN')}</span>
+                                    <span>Tạo: ${formatVietnamDate(req.created_date || req.created_at || req.CreatedDate)}</span>
                                     ${req.title ? `<span>📝 ${req.title}</span>` : ''}
                                 </div>
                             </div>
@@ -1922,7 +1911,7 @@
                             <button class="btn btn-secondary" onclick="viewRequestDetails('${req.id}')">Xem Chi Tiết</button>
                             ${status.toLowerCase() === 'pendingreview' || status.toLowerCase() === 'pending_review' ? `<button class="btn btn-primary" onclick="openSelectExpertModal('${req.id}')">👤 Chọn Chuyên Gia</button>` : ''}
                             ${status.toLowerCase() === 'pending' || status.toLowerCase() === 'submitted' || status.toLowerCase() === 'requested' ? `<button class="btn btn-danger" onclick="cancelRequest('${req.id}')">Hủy Yêu Cầu</button>` : ''}
-                            ${!paid && (status.toLowerCase() === 'completed' || status.toLowerCase() === 'finished') ? `<button class="btn btn-primary" onclick="openPaymentModal('${req.id}')">💳 Thanh Toán</button>` : ''}
+                            ${!paid && !isRequestCancelled(req) && (status.toLowerCase() === 'completed' || status.toLowerCase() === 'finished') ? `<button class="btn btn-primary" onclick="openPaymentModal('${req.id}')">💳 Thanh Toán</button>` : ''}
                         </div>
                     </div>
                 `;
@@ -1991,8 +1980,8 @@
                                 </div>
                                 <div class="card-meta">
                                     <span>ID: ${req.id}</span>
-                                    <span>📅 ${new Date(req.created_date || req.created_at || req.CreatedDate).toLocaleDateString('vi-VN')}</span>
-                                    ${req.due_date || req.dueDate || req.DueDate ? `<span>⏰ Hạn: ${new Date(req.due_date || req.dueDate || req.DueDate).toLocaleDateString('vi-VN')}</span>` : ''}
+                                    <span>📅 ${formatVietnamDate(req.created_date || req.created_at || req.CreatedDate)}</span>
+                                    ${req.due_date || req.dueDate || req.DueDate ? `<span>⏰ Hạn: ${formatVietnamDate(req.due_date || req.dueDate || req.DueDate)}</span>` : ''}
                                 </div>
                             </div>
                             <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
@@ -2032,9 +2021,7 @@
                     historyList.innerHTML = '<p style="text-align: center; color: #dc2626; padding: 20px;">❌ Lỗi tải lịch sử đơn hàng</p>';
                 }
             }
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
         }
-      }
 
       async function viewRequestDetails(requestId) {
         try {
@@ -2043,26 +2030,15 @@
           alert(
             `Chi tiết đơn hàng:\n\nID: ${request.id}\nLoại: ${
               request.service_type
-            }\nTrạng thái: ${translateStatus(request.status)}\nTạo: ${new Date(
+            }\nTrạng thái: ${translateStatus(request.status)}\nTạo: ${formatVietnamDate(
               request.created_at
-            ).toLocaleDateString("vi-VN")}`
+            )}`
           );
         } catch (error) {
           alert("Lỗi: " + error.message);
         }
       }
 
-<<<<<<< HEAD
-      async function cancelRequest(requestId) {
-        if (!confirm("Bạn có chắc muốn hủy yêu cầu này?")) return;
-        try {
-          const response = await fetch(
-            `${API_BASE}/requests/${requestId}/status`,
-            {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ status: "cancelled" }),
-=======
         async function cancelRequest(requestId) {
             if (!confirm('Bạn có chắc muốn hủy yêu cầu này?')) return;
             try {
@@ -2087,42 +2063,9 @@
             } catch (error) {
                 console.error('Error canceling request:', error);
                 alert('Lỗi: ' + error.message);
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
             }
-          );
-          if (!response.ok) throw new Error("Lỗi hủy yêu cầu");
-          loadRequests();
-        } catch (error) {
-          alert("Lỗi: " + error.message);
         }
-      }
 
-<<<<<<< HEAD
-      // ==================== PAYMENTS ====================
-      async function loadPayments() {
-        try {
-          // Fetch fresh data từ server
-          const requestsResponse = await fetch(
-            `${API_BASE}/requests/customer/${currentCustomerId}?t=${Date.now()}`
-          );
-          const requests = (await requestsResponse.ok)
-            ? await requestsResponse.json()
-            : [];
-
-          // Payment stats - đếm từ field 'paid' thực tế
-          const unpaidCount = requests.filter(
-            (r) => r.paid === false || r.paid === "false"
-          ).length;
-          const paidCount = requests.filter(
-            (r) => r.paid === true || r.paid === "true"
-          ).length;
-          const totalUnpaid = requests
-            .filter((r) => r.paid === false || r.paid === "false")
-            .reduce((sum, r) => sum + 50000, 0);
-          const totalPaid = requests
-            .filter((r) => r.paid === true || r.paid === "true")
-            .reduce((sum, r) => sum + 50000, 0);
-=======
         // ==================== SELECT EXPERT & SCHEDULE ====================
         let currentSelectExpertRequestId = null;
 
@@ -2306,12 +2249,12 @@
                 const requestsResponse = await fetch(`${API_BASE}/requests/customer/${currentCustomerId}?t=${Date.now()}`);
                 const requests = await requestsResponse.ok ? await requestsResponse.json() : [];
 
-                // Payment stats - đếm từ field 'paid' thực tế
-                const unpaidCount = requests.filter(r => !isRequestPaid(r)).length;
-                const paidCount = requests.filter(r => isRequestPaid(r)).length;
-                const totalUnpaid = requests.filter(r => !isRequestPaid(r)).reduce((sum, r) => sum + extractStudioPrice(r), 0);
-                const totalPaid = requests.filter(r => isRequestPaid(r)).reduce((sum, r) => sum + extractStudioPrice(r), 0);
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
+                // Payment stats - đếm từ field 'paid' thực tế, loại bỏ đơn bị hủy
+                const validRequests = requests.filter(r => !isRequestCancelled(r));
+                const unpaidCount = validRequests.filter(r => !isRequestPaid(r)).length;
+                const paidCount = validRequests.filter(r => isRequestPaid(r)).length;
+                const totalUnpaid = validRequests.filter(r => !isRequestPaid(r)).reduce((sum, r) => sum + extractStudioPrice(r), 0);
+                const totalPaid = validRequests.filter(r => isRequestPaid(r)).reduce((sum, r) => sum + extractStudioPrice(r), 0);
 
           const paymentStats = document.getElementById("paymentStats");
           paymentStats.innerHTML = `
@@ -2337,26 +2280,12 @@
                     </div>
                 `;
 
-<<<<<<< HEAD
-          // Unpaid requests - refresh cache
-          const unpaidRequests = document.getElementById("unpaidRequests");
-          const unpaid = requests.filter(
-            (r) => r.paid === false || r.paid === "false"
-          );
-          unpaidRequests.innerHTML =
-            unpaid.length === 0
-              ? '<p style="text-align: center; color: #999; padding: 20px;">✅ Không có đơn chưa thanh toán - Tất cả đã thanh toán!</p>'
-              : unpaid
-                  .map(
-                    (req) => `
-=======
-                // Unpaid requests - refresh cache
+                // Unpaid requests - refresh cache, loại bỏ đơn bị hủy
                 const unpaidRequests = document.getElementById('unpaidRequests');
-                const unpaid = requests.filter(r => !isRequestPaid(r));
+                const unpaid = requests.filter(r => !isRequestPaid(r) && !isRequestCancelled(r));
                 unpaidRequests.innerHTML = unpaid.length === 0 ? 
                     '<p style="text-align: center; color: #999; padding: 20px;">✅ Không có đơn chưa thanh toán - Tất cả đã thanh toán!</p>' :
                     unpaid.map(req => `
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
                         <div class="card">
                             <div class="card-header">
                                 <div>
@@ -2376,42 +2305,20 @@
                                 <span class="badge badge-unpaid">Chưa Thanh Toán</span>
                             </div>
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
-<<<<<<< HEAD
-                                <div style="font-size: 18px; font-weight: bold; color: #667eea;">50,000 ₫</div>
-                                <button class="btn btn-primary" onclick="openPaymentModal('${
-                                  req.id
-                                }')">💳 Thanh Toán Ngay</button>
-=======
                                 <div style="font-size: 18px; font-weight: bold; color: #667eea;">${new Intl.NumberFormat('vi-VN').format(extractStudioPrice(req))} ₫</div>
                                 <button class="btn btn-primary" onclick="openPaymentModal('${req.id}')">💳 Thanh Toán Ngay</button>
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
                             </div>
                         </div>
                     `
                   )
                   .join("");
 
-<<<<<<< HEAD
-          // Show paid requests
-          const paidRequests = requests.filter(
-            (r) => r.paid === true || r.paid === "true"
-          );
-          if (paidRequests.length > 0) {
-            const paidSection =
-              document.getElementById("unpaidRequests").parentElement;
-            let paidHTML =
-              '<h3 style="margin-top: 30px; margin-bottom: 20px;">✅ Các Đơn Đã Thanh Toán</h3>';
-            paidHTML += paidRequests
-              .map(
-                (req) => `
-=======
                 // Show paid requests
                 const paidRequests = requests.filter(r => isRequestPaid(r));
                 if (paidRequests.length > 0) {
                     const paidSection = document.getElementById('unpaidRequests').parentElement;
                     let paidHTML = '<h3 style="margin-top: 30px; margin-bottom: 20px;">✅ Các Đơn Đã Thanh Toán</h3>';
                     paidHTML += paidRequests.map(req => `
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
                         <div class="card" style="opacity: 0.8;">
                             <div class="card-header">
                                 <div>
@@ -2461,9 +2368,7 @@
             .map(
               (trans) => `
                     <tr>
-                        <td>${new Date(trans.created_at).toLocaleDateString(
-                          "vi-VN"
-                        )}</td>
+                        <td>${formatVietnamDate(trans.created_at)}</td>
                         <td>${trans.payment_id.substring(0, 8)}</td>
                         <td>${trans.request_id.substring(0, 8)}</td>
                         <td style="font-weight: bold; color: #667eea;">${(
@@ -2486,90 +2391,6 @@
         }
       }
 
-<<<<<<< HEAD
-      async function openPaymentModal(requestId) {
-        const modalBody = document.getElementById("paymentModalBody");
-        modalBody.innerHTML = `
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <div style="font-size: 24px; font-weight: bold; color: #667eea; margin-bottom: 10px;">50,000 ₫</div>
-                    <div style="color: #999; font-size: 14px;">Mã đơn hàng: #${requestId.substring(
-                      0,
-                      8
-                    )}</div>
-                </div>
-                
-                <form onsubmit="processPayment(event, '${requestId}')">
-                    <div class="form-group">
-                        <label>Phương Thức Thanh Toán *</label>
-                        <select id="paymentMethod" required onchange="handlePaymentMethodChange('${requestId}')">
-                            <option value="">-- Chọn Phương Thức --</option>
-                            <option value="bank_transfer">🏦 Chuyển Khoản Ngân Hàng (VietQR)</option>
-                            <option value="credit_card">💳 Thẻ Tín Dụng</option>
-                            <option value="wallet">💰 Ví Điện Tử</option>
-                        </select>
-                    </div>
-                    
-                    <div id="qrCodeSection" style="display: none; margin: 20px 0;">
-                        <div style="background: #f8f9fa; padding: 20px; border-radius: 12px; text-align: center;">
-                            <div style="font-weight: 600; margin-bottom: 15px; color: #333;">Quét mã QR để thanh toán</div>
-                            <div id="qrCodeContainer" style="display: flex; justify-content: center; margin: 15px 0;">
-                                <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                                    <img id="qrCodeImage" src="" alt="QR Code" style="width: 200px; height: 200px;">
-                                </div>
-                            </div>
-                            <div id="bankInfo" style="margin-top: 15px; font-size: 14px; color: #666;">
-                                <div style="margin-bottom: 5px;"><strong>Thông tin tài khoản:</strong></div>
-                                <div id="bankAccountInfo"></div>
-                            </div>
-                            <div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-radius: 6px; font-size: 13px; color: #856404;">
-                                ⚠️ Sau khi chuyển khoản, vui lòng nhấn "Xác nhận đã thanh toán" để hoàn tất
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Tên Người Thanh Toán</label>
-                        <input type="text" id="payerName" placeholder="Nhập tên" value="${
-                          localStorage.getItem("customerName") || ""
-                        }">
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px;">
-                        <button type="submit" class="btn btn-primary" style="flex: 1;">✓ Xác Nhận Thanh Toán</button>
-                        <button type="button" class="btn btn-secondary" onclick="closePaymentModal()" style="flex: 1;">✕ Hủy</button>
-                    </div>
-                </form>
-            `;
-        document.getElementById("paymentModal").classList.add("active");
-      }
-
-      async function handlePaymentMethodChange(requestId) {
-        const method = document.getElementById("paymentMethod").value;
-        const qrSection = document.getElementById("qrCodeSection");
-
-        if (method === "bank_transfer") {
-          qrSection.style.display = "block";
-          await loadQRCode(requestId);
-        } else {
-          qrSection.style.display = "none";
-        }
-      }
-
-      async function loadQRCode(requestId) {
-        try {
-          const response = await fetch(
-            `${API_BASE}/payments/qr/${requestId}?amount=50000`
-          );
-          if (!response.ok) throw new Error("Không thể tạo mã QR");
-
-          const qrData = await response.json();
-
-          // Hiển thị QR code
-          document.getElementById("qrCodeImage").src = qrData.qr_code;
-
-          // Hiển thị thông tin ngân hàng
-          document.getElementById("bankAccountInfo").innerHTML = `
-=======
         async function openPaymentModal(requestId) {
             try {
                 // Fetch request để lấy giá tiền
@@ -2577,6 +2398,19 @@
                 if (!requestResponse.ok) throw new Error('Không thể tải thông tin đơn hàng');
                 
                 const request = await requestResponse.json();
+                
+                // Kiểm tra đơn có bị hủy không
+                if (isRequestCancelled(request)) {
+                    alert('⚠️ Đơn hàng này đã bị hủy nên không cần thanh toán.');
+                    return;
+                }
+                
+                // Kiểm tra đơn đã thanh toán chưa
+                if (isRequestPaid(request)) {
+                    alert('✅ Đơn hàng này đã được thanh toán rồi.');
+                    return;
+                }
+                
                 const paymentAmount = extractStudioPrice(request);
                 
                 // Redirect sang trang thanh toán trong cùng frontend
@@ -2621,7 +2455,6 @@
                 
                 // Hiển thị thông tin ngân hàng
                 document.getElementById('bankAccountInfo').innerHTML = `
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
                     <div><strong>Số tài khoản:</strong> ${qrData.bank_account}</div>
                     <div><strong>Ngân hàng:</strong> ${qrData.bank_name}</div>
                     <div><strong>Nội dung:</strong> ${qrData.content}</div>
@@ -2647,82 +2480,54 @@
         }
 
         try {
-          const response = await fetch(`${API_BASE}/payments`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              customer_id: currentCustomerId,
-              service_request_id: requestId,
-              amount: "50000",
-              payment_method: method,
-            }),
-          });
-
-          if (!response.ok) throw new Error("Lỗi xử lý thanh toán");
-
-<<<<<<< HEAD
-          // Đợi 1 giây để backend lưu xong
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-=======
-            try {
-                // Get amount from stored request or fetch it
-                let amount = window.currentPaymentAmount;
-                if (!amount) {
-                    const requestResponse = await fetch(`${API_BASE}/requests/${requestId}`);
-                    if (requestResponse.ok) {
-                        const request = await requestResponse.json();
-                        amount = extractStudioPrice(request);
-                    } else {
-                        amount = 50000; // Fallback
-                    }
+            // Get amount from stored request or fetch it
+            let amount = window.currentPaymentAmount;
+            if (!amount) {
+                const requestResponse = await fetch(`${API_BASE}/requests/${requestId}`);
+                if (requestResponse.ok) {
+                    const request = await requestResponse.json();
+                    amount = extractStudioPrice(request);
+                } else {
+                    amount = 50000; // Fallback
                 }
-
-                const response = await fetch(`${API_BASE}/payments`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        customer_id: currentCustomerId,
-                        service_request_id: requestId,
-                        amount: amount.toString(),
-                        payment_method: method
-                    })
-                });
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
-
-          alert("✓ Thanh toán thành công!");
-          closePaymentModal();
-
-<<<<<<< HEAD
-          // Reload tất cả dữ liệu từ cache break
-          await loadPayments();
-          await loadRequests();
-          await loadDashboard();
-        } catch (error) {
-          alert("Lỗi: " + error.message);
-          console.error(error);
-=======
-                // Đợi 1 giây để backend lưu xong
-                await new Promise(resolve => setTimeout(resolve, 1000));
-
-                alert('✓ Thanh toán thành công!');
-                closePaymentModal();
-                
-                // Reload tất cả dữ liệu từ cache break
-                await loadPayments();
-                await loadRequests();
-                await loadDashboard();
-                
-                // Nếu là studio booking, reload studios để cập nhật status
-                const currentRequest = window.currentPaymentRequest;
-                if (currentRequest && currentRequest.description && currentRequest.description.includes('[STUDIO_BOOKING]')) {
-                    await loadStudios();
-                }
-                
-            } catch (error) {
-                alert('Lỗi: ' + error.message);
-                console.error(error);
             }
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
+
+            const response = await fetch(`${API_BASE}/payments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    customer_id: currentCustomerId,
+                    service_request_id: requestId,
+                    amount: amount.toString(),
+                    payment_method: method
+                })
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: 'Lỗi xử lý thanh toán' }));
+                throw new Error(errorData.message || errorData.detail || 'Lỗi xử lý thanh toán');
+            }
+
+            // Đợi 1 giây để backend lưu xong
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            alert('✓ Thanh toán thành công!');
+            closePaymentModal();
+            
+            // Reload tất cả dữ liệu từ cache break
+            await loadPayments();
+            await loadRequests();
+            await loadDashboard();
+            
+            // Nếu là studio booking, reload studios để cập nhật status
+            const currentRequest = window.currentPaymentRequest;
+            if (currentRequest && currentRequest.description && currentRequest.description.includes('[STUDIO_BOOKING]')) {
+                await loadStudios();
+            }
+                
+        } catch (error) {
+            alert('Lỗi: ' + error.message);
+            console.error(error);
         }
       }
 
@@ -2788,9 +2593,7 @@
                                       0,
                                       8
                                     )}</span>
-                                    <span>${new Date(
-                                      fb.created_date
-                                    ).toLocaleDateString("vi-VN")}</span>
+                                    <span>${formatVietnamDate(fb.created_date)}</span>
                                 </div>
                             </div>
                         </div>
@@ -2845,14 +2648,6 @@
         }
       }
 
-<<<<<<< HEAD
-      async function loadFeedbackHistory() {
-        try {
-          // Feedback history is now loaded in loadFeedback()
-          return;
-        } catch (error) {
-          console.error("Error loading feedback history:", error);
-=======
         // ==================== STUDIO BOOKING ====================
         let selectedStudio = null;
 
@@ -3137,64 +2932,26 @@
             } catch (error) {
                 console.error('Error loading feedback history:', error);
             }
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
         }
-      }
 
-<<<<<<< HEAD
-      // ==================== UTILITY FUNCTIONS ====================
-      function translateStatus(status) {
-        const statusMap = {
-          pending: "⏳ Chưa Xử Lý",
-          processing: "⚙️ Đang Xử Lý",
-          completed: "✅ Hoàn Thành",
-          cancelled: "❌ Đã Hủy",
-          paid: "✅ Đã Thanh Toán",
-          unpaid: "❌ Chưa Thanh Toán",
-        };
-        return statusMap[status] || status;
-      }
-
-      function getServiceIcon(serviceType) {
-        const icons = {
-          transcription: "🎤",
-          arrangement: "🎼",
-          recording: "🎙️",
-        };
-        return icons[serviceType] || "📁";
-      }
-
-      function getProgressWidth(status) {
-        const progress = {
-          pending: 25,
-          processing: 75,
-          completed: 100,
-          cancelled: 0,
-        };
-        return progress[status] || 0;
-      }
-
-      function showMessage(element, message, type) {
-        element.innerHTML = `<div class="message ${type}">${message}</div>`;
-        setTimeout(() => {
-          element.innerHTML = "";
-        }, 5000);
-      }
-
-      // Close payment modal when clicking outside
-      document.addEventListener("click", (e) => {
-        const modal = document.getElementById("paymentModal");
-        if (e.target === modal) {
-          closePaymentModal();
-        }
-      });
-=======
         // ==================== UTILITY FUNCTIONS ====================
         // Helper function to check if request is paid
         function isRequestPaid(request) {
             if (!request) return false;
             const paid = request.paid || request.Paid;
             return paid === true || paid === 'true' || paid === 1 || paid === '1';
+        }
+        
+        // Helper function to check if request is cancelled
+        function isRequestCancelled(request) {
+            if (!request) return false;
+            const status = (request.status || request.Status || '').toLowerCase();
+            return status === 'cancelled' || 
+                   status === 'canceled' || 
+                   status === 'rejectedbyexpert' || 
+                   status === 'rejected_by_expert' ||
+                   status === 'rejectedbyadmin' ||
+                   status === 'rejected_by_admin';
         }
         
         function translateStatus(status) {
@@ -3269,7 +3026,7 @@
         // Close payment modal when clicking outside
         document.addEventListener('click', (e) => {
             const paymentModal = document.getElementById('paymentModal');
-            if (e.target === paymentModal) {
+            if (e.target === paymentModal) {            
                 closePaymentModal();
             }
             
@@ -3283,7 +3040,6 @@
                 closeSelectExpertModal();
             }
         });
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
     </script>
   </body>
 </html>

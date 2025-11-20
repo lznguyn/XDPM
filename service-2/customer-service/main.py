@@ -5,7 +5,7 @@ Now uses auth-service API instead of JSON files
 """
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from enum import Enum
 
@@ -14,6 +14,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import uvicorn
 from db_client import db_client
+
+# ============================================================================
+# Timezone Configuration (UTC+7 - Vietnam Time)
+# ============================================================================
+VIETNAM_TZ = timezone(timedelta(hours=7))
+
+def get_vietnam_time() -> datetime:
+    """Lấy thời gian hiện tại theo timezone UTC+7 (Vietnam Time)"""
+    return datetime.now(VIETNAM_TZ)
+
+def format_vietnam_datetime(dt: datetime, format_str: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """Format datetime theo timezone UTC+7"""
+    if dt.tzinfo is None:
+        # Nếu không có timezone, giả sử là UTC
+        dt = dt.replace(tzinfo=timezone.utc)
+    vietnam_dt = dt.astimezone(VIETNAM_TZ)
+    return vietnam_dt.strftime(format_str)
 
 # ============================================================================
 # Enums
@@ -220,6 +237,7 @@ async def create_service_request(
     title: str = Form(...),
     description: Optional[str] = Form(None),
     due_date: Optional[str] = Form(None),
+    status: Optional[str] = Form("pending"),  # Mặc định là "pending"
     file: Optional[UploadFile] = File(None)
 ):
     """Submit new service request (transcription, arrangement, recording)"""
@@ -255,7 +273,8 @@ async def create_service_request(
             description=description,
             file_name=file_name,
             due_date=due_date_parsed.isoformat() if due_date_parsed else None,
-            priority="normal"
+            priority="normal",
+            status=status  # Truyền status từ frontend
         )
         
         return {

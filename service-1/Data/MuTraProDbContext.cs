@@ -20,6 +20,7 @@ namespace MuTraProAPI.Data
         public DbSet<CustomerTransaction> CustomerTransactions { get; set; }
         public DbSet<SpecialistSchedule> SpecialistSchedules { get; set; }
         public DbSet<ServicePrice> ServicePrices { get; set; }
+        public DbSet<Notification> Notifications { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             // Bắt buộc phải gọi base để đảm bảo các ánh xạ mặc định hoạt động
@@ -55,6 +56,11 @@ namespace MuTraProAPI.Data
             // ServicePrice Enum Conversion
             modelBuilder.Entity<ServicePrice>()
                 .Property(s => s.ServiceType)
+                .HasConversion<string>();
+            
+            // Notification Enum Conversion
+            modelBuilder.Entity<Notification>()
+                .Property(n => n.Type)
                 .HasConversion<string>();
         }
     }

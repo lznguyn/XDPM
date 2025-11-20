@@ -4,6 +4,7 @@ using MuTraProAPI.Models;
 using MuTraProAPI.Data;
 using Microsoft.AspNetCore.Authorization;
 using static MuTraProAPI.Models.ServiceRequest;
+using MuTraProAPI.Helpers;
 
 namespace MuTraProAPI.Controllers
 {
@@ -278,14 +279,24 @@ namespace MuTraProAPI.Controllers
         [HttpPatch("service-requests/{id}/status")]
         public async Task<IActionResult> UpdateServiceRequestStatus(int id, [FromBody] ServiceRequestStatusDto dto)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
+            var request = await _context.ServiceRequests
+                .Include(r => r.Customer)
+                .FirstOrDefaultAsync(r => r.Id == id);
             if (request == null)
                 return NotFound();
 
             if (Enum.TryParse(dto.Status, true, out RequestStatus status))
             {
+                var oldStatus = request.Status;
                 request.Status = status;
                 await _context.SaveChangesAsync();
+                
+                // Tạo thông báo cho khách hàng nếu trạng thái thay đổi
+                if (oldStatus != status)
+                {
+                    await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, status);
+                }
+                
                 return Ok(new { 
                     message = "Service request status updated successfully.",
                     status = request.Status.ToString()
@@ -298,7 +309,9 @@ namespace MuTraProAPI.Controllers
         [HttpPatch("service-requests/{id}/assign")]
         public async Task<IActionResult> AssignServiceRequest(int id, [FromBody] AssignServiceRequestDto dto)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
+            var request = await _context.ServiceRequests
+                .Include(r => r.Customer)
+                .FirstOrDefaultAsync(r => r.Id == id);
             if (request == null)
                 return NotFound();
 
@@ -306,9 +319,13 @@ namespace MuTraProAPI.Controllers
             if (specialist == null)
                 return NotFound(new { message = "Specialist not found" });
 
+            var oldStatus = request.Status;
             request.AssignedSpecialistId = dto.SpecialistId;
             request.Status = RequestStatus.Assigned;
             await _context.SaveChangesAsync();
+
+            // Tạo thông báo cho khách hàng
+            await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status);
 
             return Ok(new { message = "Service request assigned successfully." });
         }
@@ -317,7 +334,9 @@ namespace MuTraProAPI.Controllers
         [HttpPost("service-requests/{id}/accept")]
         public async Task<IActionResult> AcceptServiceRequest(int id)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
+            var request = await _context.ServiceRequests
+                .Include(r => r.Customer)
+                .FirstOrDefaultAsync(r => r.Id == id);
             if (request == null)
                 return NotFound();
 
@@ -325,8 +344,12 @@ namespace MuTraProAPI.Controllers
                 return BadRequest(new { message = "Only Requested or Pending requests can be accepted." });
 
             // Admin chấp nhận → chuyển sang PendingReview
+            var oldStatus = request.Status;
             request.Status = RequestStatus.PendingReview;
             await _context.SaveChangesAsync();
+
+            // Tạo thông báo cho khách hàng
+            await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status);
 
             return Ok(new { 
                 message = "Yêu cầu của bạn đã được chấp nhận. Vui lòng chọn ngày gặp chuyên gia.", 
@@ -338,7 +361,9 @@ namespace MuTraProAPI.Controllers
         [HttpPost("service-requests/{id}/reject")]
         public async Task<IActionResult> RejectServiceRequest(int id, [FromBody] RejectServiceRequestDto? dto = null)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
+            var request = await _context.ServiceRequests
+                .Include(r => r.Customer)
+                .FirstOrDefaultAsync(r => r.Id == id);
             if (request == null)
                 return NotFound();
 
@@ -346,12 +371,16 @@ namespace MuTraProAPI.Controllers
                 return BadRequest(new { message = "Only Requested or Pending requests can be rejected." });
 
             // Admin từ chối → chuyển sang Cancelled
+            var oldStatus = request.Status;
             request.Status = RequestStatus.Cancelled;
             if (!string.IsNullOrEmpty(dto?.Reason))
             {
                 request.MeetingNotes = $"Lý do từ chối: {dto.Reason}";
             }
             await _context.SaveChangesAsync();
+
+            // Tạo thông báo cho khách hàng
+            await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status, dto?.Reason);
 
             return Ok(new { 
                 message = "Yêu cầu đã bị từ chối.", 
@@ -363,7 +392,9 @@ namespace MuTraProAPI.Controllers
         [HttpPost("service-requests/{id}/schedule")]
         public async Task<IActionResult> ScheduleServiceRequest(int id, [FromBody] ScheduleServiceRequestDto dto)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
+            var request = await _context.ServiceRequests
+                .Include(r => r.Customer)
+                .FirstOrDefaultAsync(r => r.Id == id);
             if (request == null)
                 return NotFound();
 
@@ -398,12 +429,16 @@ namespace MuTraProAPI.Controllers
                 return BadRequest(new { message = "Selected time slot is not available. Specialist schedule is full." });
 
             // Update request - chuyển sang PendingMeetingConfirmation
+            var oldStatus = request.Status;
             request.AssignedSpecialistId = dto.SpecialistId;
             request.ScheduledDate = dto.ScheduledDate;
             request.ScheduledTimeSlot = dto.TimeSlot;
             request.MeetingNotes = dto.MeetingNotes;
             request.Status = RequestStatus.PendingMeetingConfirmation;
             await _context.SaveChangesAsync();
+
+            // Tạo thông báo cho khách hàng
+            await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status);
 
             // Update or create specialist schedule
             if (schedule == null)
@@ -432,7 +467,7 @@ namespace MuTraProAPI.Controllers
                     schedule.TimeSlot4 = true;
                     break;
             }
-            schedule.UpdatedAt = DateTime.Now;
+            schedule.UpdatedAt = DateTimeHelper.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Service request scheduled successfully. Waiting for expert confirmation." });
@@ -777,14 +812,14 @@ namespace MuTraProAPI.Controllers
                 {
                     ServiceType = serviceTypeEnum,
                     Price = dto.Price,
-                    UpdatedAt = DateTime.Now
+                    UpdatedAt = DateTimeHelper.Now
                 };
                 _context.ServicePrices.Add(price);
             }
             else
             {
                 price.Price = dto.Price;
-                price.UpdatedAt = DateTime.Now;
+                price.UpdatedAt = DateTimeHelper.Now;
                 if (dto.UpdatedBy.HasValue)
                 {
                     price.UpdatedBy = dto.UpdatedBy.Value;

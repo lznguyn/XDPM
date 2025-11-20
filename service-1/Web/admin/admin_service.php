@@ -1,4 +1,7 @@
 <?php
+// Cấu hình timezone UTC+7 (Vietnam Time)
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
 session_start();
 
 // Kiểm tra đăng nhập Admin
@@ -71,6 +74,7 @@ if ($priceRes['code'] == 200 && is_array($priceRes['body'])) {
 // Giá mặc định nếu chưa có
 $servicePrices['Transcription'] = $servicePrices['Transcription'] ?? 50000;
 $servicePrices['Arrangement'] = $servicePrices['Arrangement'] ?? 50000;
+$servicePrices['Recording'] = $servicePrices['Recording'] ?? 50000;
 
 // ✅ Lấy danh sách service requests từ API
 $res = callApi("$apiBase/service-requests", "GET", null, $token);
@@ -143,9 +147,9 @@ $stats = [
                 <i class="fas fa-dollar-sign text-green-600 mr-2"></i>
                 Quản lý Giá Dịch vụ
             </h2>
-            <p class="text-gray-600 text-sm mb-4">Điều chỉnh giá cho các dịch vụ (chỉ áp dụng cho Phiên âm và Hòa âm)</p>
+            <p class="text-gray-600 text-sm mb-4">Điều chỉnh giá cho các dịch vụ</p>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <!-- Transcription Price -->
                 <div class="border border-gray-200 rounded-lg p-4">
                     <form method="POST" class="space-y-3">
@@ -207,13 +211,37 @@ $stats = [
                         </div>
                     </form>
                 </div>
-            </div>
 
-            <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p class="text-sm text-yellow-800">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    <strong>Lưu ý:</strong> Dịch vụ Thu Âm (Recording) không được quản lý ở đây vì giá được quản lý riêng qua quản lý Studio.
-                </p>
+                <!-- Recording Price -->
+                <div class="border border-gray-200 rounded-lg p-4">
+                    <form method="POST" class="space-y-3">
+                        <input type="hidden" name="service_type" value="Recording">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                <i class="fas fa-microphone text-orange-600 mr-1"></i>
+                                Thu Âm (Recording)
+                            </label>
+                            <div class="flex items-center gap-2">
+                                <input type="number" 
+                                       name="price" 
+                                       value="<?= number_format($servicePrices['Recording'], 0, '', '') ?>"
+                                       min="0" 
+                                       step="1000"
+                                       required
+                                       class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent">
+                                <span class="text-gray-600 whitespace-nowrap">VNĐ</span>
+                                <button type="submit" 
+                                        name="update_price"
+                                        class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition">
+                                    <i class="fas fa-save mr-1"></i>Lưu
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">
+                                Giá hiện tại: <?= number_format($servicePrices['Recording'], 0, ',', '.') ?> VNĐ
+                            </p>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 

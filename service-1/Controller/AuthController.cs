@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MuTraProAPI.Models;
+using MuTraProAPI.Helpers;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using System.Text;
@@ -118,7 +119,7 @@ namespace MuTraProAPI.Controllers
                         Name = user.Name,
                         Email = user.Email,
                         UserId = user.Id,
-                        AccountCreated = DateTime.Now,
+                        AccountCreated = DateTimeHelper.Now,
                         IsActive = true
                     };
 
@@ -210,7 +211,7 @@ namespace MuTraProAPI.Controllers
                             Name = user.Name,
                             Email = user.Email,
                             UserId = user.Id,
-                            AccountCreated = DateTime.Now,
+                            AccountCreated = DateTimeHelper.Now,
                             IsActive = true
                         };
                         _context.Customers.Add(customer);
@@ -256,7 +257,7 @@ namespace MuTraProAPI.Controllers
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.Now.AddHours(12),
+                expires: DateTimeHelper.Now.AddHours(12),
                 signingCredentials: creds
             );
 

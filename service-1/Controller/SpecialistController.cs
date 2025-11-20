@@ -3,6 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using MuTraProAPI.Models;
 using MuTraProAPI.Data;
 using Microsoft.AspNetCore.Authorization;
+using System.Text.Json.Serialization;
+using System.Text.Json;
+using MuTraProAPI.Helpers;
 
 namespace MuTraProAPI.Controllers
 {
@@ -84,7 +87,9 @@ namespace MuTraProAPI.Controllers
         [HttpPost("requests/{id}/accept-meeting")]
         public async Task<IActionResult> AcceptMeeting(int id)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
+            var request = await _context.ServiceRequests
+                .Include(r => r.Customer)
+                .FirstOrDefaultAsync(r => r.Id == id);
             if (request == null)
                 return NotFound(new { message = "Request not found" });
 
@@ -92,8 +97,12 @@ namespace MuTraProAPI.Controllers
                 return BadRequest(new { message = "Chỉ có thể chấp nhận meeting khi ở trạng thái PendingMeetingConfirmation." });
 
             // Chuyên gia chấp nhận → chuyển sang Completed
+            var oldStatus = request.Status;
             request.Status = RequestStatus.Completed;
             await _context.SaveChangesAsync();
+
+            // Tạo thông báo cho khách hàng
+            await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status);
 
             return Ok(new { 
                 message = "Yêu cầu của bạn đã được hoàn thành. Vui lòng thanh toán.", 
@@ -105,7 +114,9 @@ namespace MuTraProAPI.Controllers
         [HttpPost("requests/{id}/reject-meeting")]
         public async Task<IActionResult> RejectMeeting(int id, [FromBody] RejectMeetingDto? dto = null)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
+            var request = await _context.ServiceRequests
+                .Include(r => r.Customer)
+                .FirstOrDefaultAsync(r => r.Id == id);
             if (request == null)
                 return NotFound(new { message = "Request not found" });
 
@@ -113,6 +124,7 @@ namespace MuTraProAPI.Controllers
                 return BadRequest(new { message = "Chỉ có thể từ chối meeting khi ở trạng thái PendingMeetingConfirmation." });
 
             // Chuyên gia từ chối → chuyển sang RejectedByExpert hoặc Cancelled
+            var oldStatus = request.Status;
             request.Status = RequestStatus.RejectedByExpert;
             if (!string.IsNullOrEmpty(dto?.Reason))
             {
@@ -143,11 +155,14 @@ namespace MuTraProAPI.Controllers
                             schedule.TimeSlot4 = false;
                             break;
                     }
-                    schedule.UpdatedAt = DateTime.Now;
+                    schedule.UpdatedAt = DateTimeHelper.Now;
                 }
             }
 
             await _context.SaveChangesAsync();
+
+            // Tạo thông báo cho khách hàng
+            await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status, dto?.Reason);
 
             return Ok(new { 
                 message = $"Chuyên gia đã từ chối gặp{(dto?.Reason != null ? $", lý do: {dto.Reason}" : "")}.", 
@@ -159,7 +174,9 @@ namespace MuTraProAPI.Controllers
         [HttpPut("requests/{id}/respond")]
         public async Task<IActionResult> RespondToRequest(int id, [FromBody] RespondToRequestDto dto)
         {
-            var request = await _context.ServiceRequests.FindAsync(id);
+            var request = await _context.ServiceRequests
+                .Include(r => r.Customer)
+                .FirstOrDefaultAsync(r => r.Id == id);
             if (request == null)
                 return NotFound(new { message = "Request not found" });
 
@@ -171,12 +188,19 @@ namespace MuTraProAPI.Controllers
                 request.MeetingNotes = (request.MeetingNotes ?? "") + "\n" + dto.Notes;
             }
 
+            var oldStatus = request.Status;
             if (Enum.TryParse(dto.NewStatus, true, out RequestStatus newStatus))
             {
                 request.Status = newStatus;
             }
 
             await _context.SaveChangesAsync();
+
+            // Tạo thông báo cho khách hàng nếu trạng thái thay đổi
+            if (oldStatus != request.Status)
+            {
+                await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status);
+            }
 
             return Ok(new { message = "Response recorded successfully.", status = request.Status.ToString() });
         }
@@ -223,22 +247,25 @@ namespace MuTraProAPI.Controllers
 
             try
             {
+                // Đảm bảo date chỉ lấy phần ngày (bỏ qua time và timezone)
+                var targetDate = dto.Date.Date;
+                
                 var schedule = await _context.SpecialistSchedules
                     .FirstOrDefaultAsync(s => s.SpecialistId == dto.SpecialistId && 
-                                             s.Date.Date == dto.Date.Date);
+                                             s.Date.Date == targetDate);
 
                 if (schedule == null)
                 {
                     schedule = new SpecialistSchedule
                     {
                         SpecialistId = dto.SpecialistId,
-                        Date = dto.Date.Date,
+                        Date = targetDate, // Sử dụng targetDate đã được normalize
                         TimeSlot1 = dto.TimeSlot1,
                         TimeSlot2 = dto.TimeSlot2,
                         TimeSlot3 = dto.TimeSlot3,
                         TimeSlot4 = dto.TimeSlot4,
-                        CreatedAt = DateTime.Now,
-                        UpdatedAt = DateTime.Now
+                        CreatedAt = DateTimeHelper.Now,
+                        UpdatedAt = DateTimeHelper.Now
                     };
                     _context.SpecialistSchedules.Add(schedule);
                 }
@@ -248,7 +275,7 @@ namespace MuTraProAPI.Controllers
                     schedule.TimeSlot2 = dto.TimeSlot2;
                     schedule.TimeSlot3 = dto.TimeSlot3;
                     schedule.TimeSlot4 = dto.TimeSlot4;
-                    schedule.UpdatedAt = DateTime.Now;
+                    schedule.UpdatedAt = DateTimeHelper.Now;
                 }
 
                 await _context.SaveChangesAsync();
@@ -279,11 +306,34 @@ namespace MuTraProAPI.Controllers
         public class UpdateScheduleDto
         {
             public int SpecialistId { get; set; }
+            [JsonConverter(typeof(DateOnlyJsonConverter))]
             public DateTime Date { get; set; }
             public bool TimeSlot1 { get; set; }
             public bool TimeSlot2 { get; set; }
             public bool TimeSlot3 { get; set; }
             public bool TimeSlot4 { get; set; }
+        }
+        
+        // Custom JSON converter để parse date string đúng (không bị lệch timezone)
+        public class DateOnlyJsonConverter : JsonConverter<DateTime>
+        {
+            public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                if (reader.TokenType == JsonTokenType.String)
+                {
+                    var dateString = reader.GetString();
+                    if (DateTime.TryParseExact(dateString, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out var date))
+                    {
+                        return date.Date; // Chỉ lấy phần date, bỏ qua time
+                    }
+                }
+                throw new JsonException($"Unable to parse date: {reader.GetString()}");
+            }
+
+            public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+            {
+                writer.WriteStringValue(value.ToString("yyyy-MM-dd"));
+            }
         }
 
         public class RejectMeetingDto

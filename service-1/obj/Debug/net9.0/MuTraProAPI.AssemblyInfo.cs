@@ -13,11 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MuTraProAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-<<<<<<< HEAD
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0e94abc52fdefcf2f5b9109ce7d0832d35250bff")]
-=======
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+5ec8dab1f6e584dd1761948da95f9f57b4be1e43")]
->>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+09d4d54059da2d96e2496f846315e250d481ce81")]
 [assembly: System.Reflection.AssemblyProductAttribute("MuTraProAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MuTraProAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

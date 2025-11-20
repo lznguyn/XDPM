@@ -1,4 +1,7 @@
 <?php
+// Cấu hình timezone UTC+7 (Vietnam Time)
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
 session_start();
 $admin_id = $_SESSION['user']['id'] ?? null;
 if (!$admin_id) {

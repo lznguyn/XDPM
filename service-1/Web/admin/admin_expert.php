@@ -1,4 +1,7 @@
 <?php
+// Cấu hình timezone UTC+7 (Vietnam Time)
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
 session_start();
 
 // Kiểm tra đăng nhập Admin

@@ -35,7 +35,7 @@ namespace MuTraProAPI.Models
         public RequestStatus Status { get; set; } = RequestStatus.Pending;
 
         [Column("created_date")]
-        public DateTime CreatedDate { get; set; } = DateTime.Now;
+        public DateTime CreatedDate { get; set; } = DateTime.UtcNow; // Sẽ được set trong controller với DateTimeHelper.Now
 
         [Column("due_date")]
         public DateTime? DueDate { get; set; }

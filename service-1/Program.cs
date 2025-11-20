@@ -4,8 +4,15 @@ using System.Text.Json.Serialization; // THÊM DÒNG NÀY
 using System.Text.Json;                   // Cho JsonNamingPolicy
 using Microsoft.AspNetCore.Http;
 using Microsoft.OpenApi.Models;
+using System.Globalization;
+using MuTraProAPI.Helpers;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// === Cấu hình Timezone UTC+7 (Vietnam Time) ===
+// Set default culture cho toàn bộ ứng dụng
+CultureInfo.DefaultThreadCurrentCulture = new CultureInfo("vi-VN");
+CultureInfo.DefaultThreadCurrentUICulture = new CultureInfo("vi-VN");
 
 // === CORS ===
 builder.Services.AddCors(options =>
@@ -96,7 +103,7 @@ app.UseAuthorization();
 // === Health Check (BẮT BUỘC CHO DOCKER) ===
 app.MapGet("/health", () => Results.Ok(new { 
     status = "Healthy", 
-    time = DateTime.UtcNow 
+    time = DateTimeHelper.Now 
 }));
 
 app.MapControllers();

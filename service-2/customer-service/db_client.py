@@ -71,7 +71,8 @@ class DatabaseClient:
     # Service Request operations
     async def create_service_request(self, customer_id: int, service_type: str, title: str,
                                     description: Optional[str] = None, file_name: Optional[str] = None,
-                                    due_date: Optional[str] = None, priority: str = "normal") -> Dict[str, Any]:
+                                    due_date: Optional[str] = None, priority: str = "normal",
+                                    status: Optional[str] = "pending") -> Dict[str, Any]:
         """Create a new service request"""
         data = {
             "customerId": customer_id,
@@ -80,7 +81,8 @@ class DatabaseClient:
             "description": description,
             "fileName": file_name,
             "dueDate": due_date,
-            "priority": priority
+            "priority": priority,
+            "status": status  # Thêm status vào request
         }
         response = await self.client.post(f"{self.base_url}/requests", json=data)
         response.raise_for_status()

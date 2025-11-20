@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MuTraProAPI.Models;
 using MuTraProAPI.Data;
 using BCrypt.Net;
+using MuTraProAPI.Helpers;
 
 namespace MuTraProAPI.Controllers
 {
@@ -67,7 +68,7 @@ namespace MuTraProAPI.Controllers
                 Email = dto.Email,
                 Phone = dto.Phone,
                 Address = dto.Address,
-                AccountCreated = DateTime.Now,
+                AccountCreated = DateTimeHelper.Now,
                 IsActive = true,
                 UserId = userId
             };
@@ -168,6 +169,16 @@ namespace MuTraProAPI.Controllers
             if (customer == null)
                 return NotFound(new { message = "Customer not found" });
 
+            // Parse status từ DTO, mặc định là Pending nếu không có hoặc không hợp lệ
+            RequestStatus requestStatus = RequestStatus.Pending;
+            if (!string.IsNullOrEmpty(dto.Status))
+            {
+                if (Enum.TryParse<RequestStatus>(dto.Status, true, out var parsedStatus))
+                {
+                    requestStatus = parsedStatus;
+                }
+            }
+
             var request = new ServiceRequest
             {
                 CustomerId = dto.CustomerId,
@@ -175,8 +186,8 @@ namespace MuTraProAPI.Controllers
                 Title = dto.Title,
                 Description = dto.Description,
                 FileName = dto.FileName,
-                Status = RequestStatus.Requested, // Trạng thái ban đầu: Requested
-                CreatedDate = DateTime.Now,
+                Status = requestStatus, // Sử dụng status từ DTO hoặc mặc định là Pending
+                CreatedDate = DateTimeHelper.Now,
                 DueDate = dto.DueDate,
                 Priority = dto.Priority ?? "normal",
                 Paid = false
@@ -366,7 +377,7 @@ namespace MuTraProAPI.Controllers
                     schedule.TimeSlot4 = true;
                     break;
             }
-            schedule.UpdatedAt = DateTime.Now;
+            schedule.UpdatedAt = DateTimeHelper.Now;
             await _context.SaveChangesAsync();
 
             return Ok(new
@@ -428,7 +439,7 @@ namespace MuTraProAPI.Controllers
                 Amount = dto.Amount,
                 PaymentMethod = dto.PaymentMethod,
                 PaymentStatus = CustomerPaymentStatus.Completed,
-                PaymentDate = DateTime.Now,
+                PaymentDate = DateTimeHelper.Now,
                 TransactionId = Guid.NewGuid().ToString()
             };
 
@@ -454,7 +465,7 @@ namespace MuTraProAPI.Controllers
                 Description = $"Payment for service request {dto.ServiceRequestId}",
                 Amount = dto.Amount,
                 TransactionType = TransactionType.Payment,
-                Date = DateTime.Now,
+                Date = DateTimeHelper.Now,
                 PaymentId = payment.Id
             };
 
@@ -533,6 +544,7 @@ namespace MuTraProAPI.Controllers
             public string? FileName { get; set; }
             public DateTime? DueDate { get; set; }
             public string? Priority { get; set; }
+            public string? Status { get; set; } // Thêm field Status
         }
 
         public class UpdateRequestStatusDto
