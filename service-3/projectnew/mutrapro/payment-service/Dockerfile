@@ -16,7 +16,7 @@ COPY . .
 RUN npm run build
 
 # 7. Khai báo port
-EXPOSE 3000
+EXPOSE 3001
 
 # 8. Lệnh chạy app
 CMD ["node", "dist/main.js"]

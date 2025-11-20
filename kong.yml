@@ -63,6 +63,7 @@ services:
           - /feedback
           - /payments
           - /transactions
+          - /studios
           - /health
         strip_path: false
         preserve_host: true

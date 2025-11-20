@@ -57,7 +57,9 @@ namespace MuTraProAPI.Controllers
             {
                 Name = request.Name,
                 Location = request.Location,
-                Status = request.Status
+                Status = request.Status,
+                Price = request.Price,
+                Image = request.Image
             };
 
             _context.Studios.Add(studio);
@@ -79,6 +81,10 @@ namespace MuTraProAPI.Controllers
                 studio.Location = request.Location;
             if (request.Status.HasValue)
                 studio.Status = request.Status.Value;
+            if (request.Price.HasValue)
+                studio.Price = request.Price.Value;
+            if (request.Image != null)
+                studio.Image = request.Image;
 
             _context.Studios.Update(studio);
             await _context.SaveChangesAsync();
@@ -104,15 +110,37 @@ namespace MuTraProAPI.Controllers
     // ===== Request Models =====
     public class StudioCreateRequest
     {
-         public string Name { get; set; } = string.Empty;
+        [System.Text.Json.Serialization.JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+        
+        [System.Text.Json.Serialization.JsonPropertyName("location")]
         public string Location { get; set; } = string.Empty;
+        
+        [System.Text.Json.Serialization.JsonPropertyName("price")]
+        public decimal Price { get; set; } = 0;
+        
+        [System.Text.Json.Serialization.JsonPropertyName("status")]
         public StudioStatus Status { get; set; } = StudioStatus.Available;
+        
+        [System.Text.Json.Serialization.JsonPropertyName("image")]
+        public string? Image { get; set; }
     }
 
     public class StudioUpdateRequest
     {
-       public string? Name { get; set; }
+        [System.Text.Json.Serialization.JsonPropertyName("name")]
+        public string? Name { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("location")]
         public string? Location { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("price")]
+        public decimal? Price { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("status")]
         public StudioStatus? Status { get; set; }
+        
+        [System.Text.Json.Serialization.JsonPropertyName("image")]
+        public string? Image { get; set; }
     }
 }

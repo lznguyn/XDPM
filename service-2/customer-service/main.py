@@ -24,13 +24,17 @@ class ServiceType(str, Enum):
     RECORDING = "recording"
 
 class RequestStatus(str, Enum):
+    REQUESTED = "requested"
+    PENDING_REVIEW = "pending_review"
+    CANCELLED = "cancelled"
+    PENDING_MEETING_CONFIRMATION = "pending_meeting_confirmation"
+    COMPLETED = "completed"
+    REJECTED_BY_EXPERT = "rejected_by_expert"
+    # Legacy statuses (kept for backward compatibility)
     SUBMITTED = "submitted"
     ASSIGNED = "assigned"
     IN_PROGRESS = "in_progress"
-    PENDING_REVIEW = "pending_review"
-    COMPLETED = "completed"
     REVISION_REQUESTED = "revision_requested"
-    CANCELLED = "cancelled"
 
 class PaymentStatus(str, Enum):
     PENDING = "pending"
@@ -92,6 +96,22 @@ class Transaction(BaseModel):
     amount: float
     transaction_type: str  # payment, refund, credit
     date: str
+
+class StudioCreate(BaseModel):
+    """Studio creation request"""
+    name: str
+    location: str
+    price: float
+    status: int = 0  # 0=Available, 1=Occupied, 2=UnderMaintenance
+    image: Optional[str] = None
+
+class StudioUpdate(BaseModel):
+    """Studio update request"""
+    name: Optional[str] = None
+    location: Optional[str] = None
+    price: Optional[float] = None
+    status: Optional[int] = None
+    image: Optional[str] = None
 
 # ============================================================================
 # File Upload Directory
@@ -319,13 +339,17 @@ async def update_request_status(request_id: str, status: RequestStatus = Form(..
         status_str = status.value
         # Map to database enum values
         status_map = {
+            "requested": "Requested",
+            "pending_review": "PendingReview",
+            "cancelled": "Cancelled",
+            "pending_meeting_confirmation": "PendingMeetingConfirmation",
+            "completed": "Completed",
+            "rejected_by_expert": "RejectedByExpert",
+            # Legacy statuses
             "submitted": "Submitted",
             "assigned": "Assigned",
             "in_progress": "InProgress",
-            "pending_review": "PendingReview",
-            "completed": "Completed",
-            "revision_requested": "RevisionRequested",
-            "cancelled": "Cancelled"
+            "revision_requested": "RevisionRequested"
         }
         db_status = status_map.get(status_str, status_str.capitalize())
         
@@ -381,6 +405,7 @@ async def create_payment(
     
     try:
         # Tạo payment record
+        # Lưu ý: CreatePayment endpoint trong CustomerController đã tự động cập nhật paid = true
         payment = await db_client.create_payment(
             customer_id=int(customer_id),
             service_request_id=int(service_request_id),
@@ -388,23 +413,24 @@ async def create_payment(
             payment_method=payment_method
         )
         
-        # Sau khi tạo payment thành công, cập nhật paid status của service request
+        # Verify that paid status was updated (CreatePayment should have done this)
+        # Nếu cần, có thể gọi update_request_paid_status như một backup
         try:
-            auth_service_url = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8081")
-            async with httpx.AsyncClient() as client:
-                # Cập nhật paid status qua endpoint PATCH
-                update_response = await client.patch(
-                    f"{auth_service_url}/api/Customer/requests/{service_request_id}/paid",
-                    json={"paid": True},
-                    timeout=10.0
-                )
-                if update_response.status_code == 200:
-                    print(f"[PAYMENT] Successfully updated paid status for request {service_request_id}")
-                else:
-                    print(f"[PAYMENT] Warning: Could not update request paid status: {update_response.status_code} - {update_response.text}")
+            # Double-check: verify paid status was set
+            request_check = await db_client.get_service_request(int(service_request_id))
+            if request_check and not request_check.get("paid", False):
+                # Nếu chưa được cập nhật, thử cập nhật lại
+                print(f"[PAYMENT] Paid status not updated by CreatePayment, updating manually...")
+                await db_client.update_request_paid_status(int(service_request_id), True)
+                print(f"[PAYMENT] Successfully updated paid status for request {service_request_id}")
+            else:
+                print(f"[PAYMENT] Paid status already set to true for request {service_request_id}")
         except Exception as e:
             # Log error nhưng không fail payment
-            print(f"[PAYMENT] Warning: Could not update request paid status: {e}")
+            print(f"[PAYMENT WARNING] Could not verify/update paid status: {e}")
+            import traceback
+            traceback.print_exc()
+            # Không raise exception ở đây để payment vẫn được tạo
         
         return {
             "id": str(payment["id"]),
@@ -494,6 +520,88 @@ async def get_customer_transactions(customer_id: str):
             "date": t["date"],
             "payment_id": str(t["payment_id"]) if t.get("payment_id") else None
         } for t in transactions]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# STUDIO ENDPOINTS
+# ============================================================================
+@app.get("/studios")
+async def list_studios():
+    """Get all studios"""
+    try:
+        result = await db_client.get_all_studios()
+        # API trả về format: { status: "success", message: "...", data: [...] }
+        # Giữ nguyên format từ service-1
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/studios/{studio_id}")
+async def get_studio(studio_id: str):
+    """Get studio by ID"""
+    try:
+        result = await db_client.get_studio(int(studio_id))
+        # API trả về format: { status: "success", message: "...", data: {...} }
+        # hoặc { status: "error", message: "..." }
+        if result.get("status") == "error":
+            raise HTTPException(status_code=404, detail=result.get("message", "Studio not found"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/studios")
+async def create_studio(studio: StudioCreate):
+    """Create a new studio"""
+    try:
+        result = await db_client.create_studio(
+            name=studio.name,
+            location=studio.location,
+            price=studio.price,
+            status=studio.status,
+            image=studio.image
+        )
+        # API trả về format: { status: "success", message: "...", data: {...} }
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/studios/{studio_id}")
+async def update_studio(studio_id: str, studio: StudioUpdate):
+    """Update studio"""
+    try:
+        result = await db_client.update_studio(
+            studio_id=int(studio_id),
+            name=studio.name,
+            location=studio.location,
+            price=studio.price,
+            status=studio.status,
+            image=studio.image
+        )
+        # API trả về format: { status: "success", message: "...", data: {...} }
+        # hoặc { status: "error", message: "..." }
+        if result.get("status") == "error":
+            raise HTTPException(status_code=404, detail=result.get("message", "Studio not found"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/studios/{studio_id}")
+async def delete_studio(studio_id: str):
+    """Delete studio"""
+    try:
+        result = await db_client.delete_studio(int(studio_id))
+        # API trả về format: { status: "success", message: "..." }
+        # hoặc { status: "error", message: "..." }
+        if result.get("status") == "error":
+            raise HTTPException(status_code=404, detail=result.get("message", "Studio not found"))
+        return result
     except HTTPException:
         raise
     except Exception as e:

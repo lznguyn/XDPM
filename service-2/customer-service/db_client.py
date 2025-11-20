@@ -115,6 +115,13 @@ class DatabaseClient:
         response.raise_for_status()
         return response.json()
     
+    async def update_request_paid_status(self, request_id: int, paid: bool) -> Dict[str, Any]:
+        """Update service request paid status"""
+        data = {"paid": paid}
+        response = await self.client.patch(f"{self.base_url}/requests/{request_id}/paid", json=data)
+        response.raise_for_status()
+        return response.json()
+    
     # Feedback operations
     async def create_feedback(self, request_id: int, feedback_text: str, 
                              revision_needed: bool = False) -> Dict[str, Any]:
@@ -151,6 +158,85 @@ class DatabaseClient:
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 return []
+            raise
+    
+    # Studio operations
+    async def get_all_studios(self) -> Dict[str, Any]:
+        """Get all studios"""
+        # Studio API is in service-1 (auth-service), endpoint is /api/Experts
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        try:
+            response = await self.client.get(studio_api_base)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {"status": "error", "message": "Không tìm thấy studio!", "data": []}
+            raise
+    
+    async def get_studio(self, studio_id: int) -> Dict[str, Any]:
+        """Get studio by ID"""
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        try:
+            response = await self.client.get(f"{studio_api_base}/{studio_id}")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {"status": "error", "message": "Không tìm thấy phòng thu!"}
+            raise
+    
+    async def create_studio(self, name: str, location: str, price: float, 
+                           status: int = 0, image: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new studio"""
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        data = {
+            "name": name,
+            "location": location,
+            "price": price,
+            "status": status,
+            "image": image
+        }
+        response = await self.client.post(studio_api_base, json=data)
+        response.raise_for_status()
+        return response.json()
+    
+    async def update_studio(self, studio_id: int, name: Optional[str] = None,
+                           location: Optional[str] = None, price: Optional[float] = None,
+                           status: Optional[int] = None, image: Optional[str] = None) -> Dict[str, Any]:
+        """Update studio"""
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        data = {}
+        if name:
+            data["name"] = name
+        if location:
+            data["location"] = location
+        if price is not None:
+            data["price"] = price
+        if status is not None:
+            data["status"] = status
+        if image is not None:
+            data["image"] = image
+        
+        try:
+            response = await self.client.put(f"{studio_api_base}/{studio_id}", json=data)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {"status": "error", "message": "Không tìm thấy phòng thu!"}
+            raise
+    
+    async def delete_studio(self, studio_id: int) -> Dict[str, Any]:
+        """Delete studio"""
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        try:
+            response = await self.client.delete(f"{studio_api_base}/{studio_id}")
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return {"status": "error", "message": "Không tìm thấy phòng thu!"}
             raise
 
 # Global database client instance

@@ -8,7 +8,7 @@ if (!$admin_id) {
     exit();
 }
 
-// API base URL - Sử dụng Kong Gateway
+// API base URL - Gọi qua Kong Gateway
 $apiBase = "http://localhost:8000/api/Admin";
 $token = $_SESSION['token'] ?? '';
 

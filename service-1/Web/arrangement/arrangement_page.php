@@ -13,7 +13,7 @@ if (!$specialist_id || !in_array($specialist_role, $expertRoles)) {
     exit();
 }
 
-// API base URL
+// API base URL - Gọi qua Kong Gateway
 $apiBase = "http://localhost:8000/api";
 $specialistApiBase = "$apiBase/Specialist";
 
@@ -81,7 +81,42 @@ if (isset($_POST['update_schedule'])) {
     exit();
 }
 
-// Xử lý phản hồi yêu cầu
+// Xử lý chấp nhận meeting
+if (isset($_POST['accept_meeting'])) {
+    $requestId = intval($_POST['request_id']);
+    
+    $res = callApi("$specialistApiBase/requests/$requestId/accept-meeting", "POST", null, $token);
+    
+    if ($res['code'] == 200) {
+        $_SESSION['toast_message'] = "✅ Đã chấp nhận meeting thành công!";
+    } else {
+        $_SESSION['toast_message'] = "❌ Lỗi: " . ($res['body']['message'] ?? 'Unknown error');
+    }
+    
+    header('location:arrangement_page.php');
+    exit();
+}
+
+// Xử lý từ chối meeting
+if (isset($_POST['reject_meeting'])) {
+    $requestId = intval($_POST['request_id']);
+    $reason = $_POST['reject_reason'] ?? '';
+    
+    $res = callApi("$specialistApiBase/requests/$requestId/reject-meeting", "POST", [
+        "reason" => $reason
+    ], $token);
+    
+    if ($res['code'] == 200) {
+        $_SESSION['toast_message'] = "✅ Đã từ chối meeting.";
+    } else {
+        $_SESSION['toast_message'] = "❌ Lỗi: " . ($res['body']['message'] ?? 'Unknown error');
+    }
+    
+    header('location:arrangement_page.php');
+    exit();
+}
+
+// Xử lý phản hồi yêu cầu (cho các request khác không phải PendingMeetingConfirmation)
 if (isset($_POST['respond_request'])) {
     $requestId = intval($_POST['request_id']);
     $notes = $_POST['notes'] ?? '';
@@ -170,63 +205,154 @@ $mySchedule = $scheduleRes['body'] ?? [];
                             <p class="text-gray-500">Chưa có yêu cầu nào được gán cho bạn.</p>
                         </div>
                     <?php else: ?>
-                        <div class="space-y-4">
-                            <?php foreach ($myRequests as $req): ?>
-                            <div class="border border-gray-200 rounded-lg p-4">
-                                <div class="flex justify-between items-start mb-3">
-                                    <div>
-                                        <h3 class="font-semibold text-lg text-gray-900"><?= htmlspecialchars($req['title'] ?? 'N/A') ?></h3>
-                                        <p class="text-sm text-gray-600 mt-1">
-                                            <i class="fas fa-user mr-2"></i><?= htmlspecialchars($req['customerName'] ?? 'N/A') ?>
+                        <?php
+                        // Phân loại requests: PendingMeetingConfirmation và các request khác
+                        $pendingMeetings = array_filter($myRequests, function($req) {
+                            $status = strtolower($req['status'] ?? '');
+                            return $status === 'pendingmeetingconfirmation' || $status === 'pending_meeting_confirmation';
+                        });
+                        $otherRequests = array_filter($myRequests, function($req) {
+                            $status = strtolower($req['status'] ?? '');
+                            return $status !== 'pendingmeetingconfirmation' && $status !== 'pending_meeting_confirmation';
+                        });
+                        ?>
+                        
+                        <!-- Pending Meeting Confirmation Requests -->
+                        <?php if (!empty($pendingMeetings)): ?>
+                        <div class="mb-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                                <i class="fas fa-clock text-orange-500 mr-2"></i>Chờ Xác Nhận Meeting
+                            </h3>
+                            <div class="space-y-4">
+                                <?php foreach ($pendingMeetings as $req): ?>
+                                <div class="border-2 border-orange-200 rounded-lg p-4 bg-orange-50">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 class="font-semibold text-lg text-gray-900"><?= htmlspecialchars($req['title'] ?? 'N/A') ?></h3>
+                                            <p class="text-sm text-gray-600 mt-1">
+                                                <i class="fas fa-user mr-2"></i><?= htmlspecialchars($req['customerName'] ?? 'N/A') ?>
+                                                <span class="mx-2">•</span>
+                                                <i class="fas fa-tag mr-2"></i><?= htmlspecialchars($req['serviceType'] ?? 'N/A') ?>
+                                            </p>
+                                        </div>
+                                        <span class="px-3 py-1 bg-orange-200 text-orange-800 rounded-full text-xs font-medium">
+                                            ⏰ Chờ Xác Nhận
+                                        </span>
+                                    </div>
+                                    
+                                    <?php if (!empty($req['description'])): ?>
+                                    <p class="text-gray-700 mb-3"><?= htmlspecialchars($req['description']) ?></p>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!empty($req['scheduledDate'])): ?>
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                                        <p class="text-sm text-blue-700">
+                                            <i class="fas fa-calendar-check mr-2"></i>
+                                            <strong>Lịch hẹn:</strong> <?= date('d/m/Y', strtotime($req['scheduledDate'])) ?>
+                                            <?php if (!empty($req['scheduledTimeSlot'])): ?>
                                             <span class="mx-2">•</span>
-                                            <i class="fas fa-tag mr-2"></i><?= htmlspecialchars($req['serviceType'] ?? 'N/A') ?>
+                                            <strong>Ca:</strong> <?= htmlspecialchars($req['scheduledTimeSlot']) ?>
+                                            <?php endif; ?>
                                         </p>
                                     </div>
-                                    <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
-                                        <?= htmlspecialchars($req['status'] ?? 'N/A') ?>
-                                    </span>
-                                </div>
-                                
-                                <?php if (!empty($req['description'])): ?>
-                                <p class="text-gray-700 mb-3"><?= htmlspecialchars($req['description']) ?></p>
-                                <?php endif; ?>
-                                
-                                <?php if (!empty($req['scheduledDate'])): ?>
-                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                                    <p class="text-sm text-blue-700">
-                                        <i class="fas fa-calendar-check mr-2"></i>
-                                        <strong>Lịch hẹn:</strong> <?= date('d/m/Y', strtotime($req['scheduledDate'])) ?>
-                                        <?php if (!empty($req['scheduledTimeSlot'])): ?>
-                                        <span class="mx-2">•</span>
-                                        <strong>Ca:</strong> <?= htmlspecialchars($req['scheduledTimeSlot']) ?>
-                                        <?php endif; ?>
-                                    </p>
-                                </div>
-                                <?php endif; ?>
-                                
-                                <form method="POST" class="mt-4">
-                                    <input type="hidden" name="request_id" value="<?= $req['id'] ?>">
-                                    <div class="mb-3">
-                                        <label class="block text-sm font-medium text-gray-700 mb-2">Ghi chú phản hồi:</label>
-                                        <textarea name="notes" rows="3" 
-                                                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                                  placeholder="Nhập ghi chú phản hồi..."></textarea>
+                                    <?php endif; ?>
+                                    
+                                    <!-- Accept/Reject Buttons -->
+                                    <div class="mt-4 space-y-3">
+                                        <form method="POST" class="inline-block">
+                                            <input type="hidden" name="request_id" value="<?= $req['id'] ?>">
+                                            <button type="submit" name="accept_meeting" 
+                                                    class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg font-medium transition w-full">
+                                                <i class="fas fa-check-circle mr-2"></i>✅ Chấp Nhận Meeting
+                                            </button>
+                                        </form>
+                                        
+                                        <form method="POST" class="inline-block">
+                                            <input type="hidden" name="request_id" value="<?= $req['id'] ?>">
+                                            <div class="mb-2">
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Lý do từ chối (nếu có):</label>
+                                                <textarea name="reject_reason" rows="2" 
+                                                          class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                                          placeholder="Nhập lý do từ chối (tùy chọn)..."></textarea>
+                                            </div>
+                                            <button type="submit" name="reject_meeting" 
+                                                    class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium transition w-full"
+                                                    onclick="return confirm('Bạn có chắc muốn từ chối meeting này?');">
+                                                <i class="fas fa-times-circle mr-2"></i>❌ Từ Chối Meeting
+                                            </button>
+                                        </form>
                                     </div>
-                                    <div class="flex gap-2">
-                                        <select name="new_status" class="px-4 py-2 border border-gray-300 rounded-lg">
-                                            <option value="">Giữ nguyên trạng thái</option>
-                                            <option value="InProgress">InProgress</option>
-                                            <option value="Completed">Completed</option>
-                                        </select>
-                                        <button type="submit" name="respond_request" 
-                                                class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition">
-                                            <i class="fas fa-paper-plane mr-2"></i>Phản hồi
-                                        </button>
-                                    </div>
-                                </form>
+                                </div>
+                                <?php endforeach; ?>
                             </div>
-                            <?php endforeach; ?>
                         </div>
+                        <?php endif; ?>
+                        
+                        <!-- Other Requests -->
+                        <?php if (!empty($otherRequests)): ?>
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                                <i class="fas fa-tasks text-purple-600 mr-2"></i>Các Yêu Cầu Khác
+                            </h3>
+                            <div class="space-y-4">
+                                <?php foreach ($otherRequests as $req): ?>
+                                <div class="border border-gray-200 rounded-lg p-4">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 class="font-semibold text-lg text-gray-900"><?= htmlspecialchars($req['title'] ?? 'N/A') ?></h3>
+                                            <p class="text-sm text-gray-600 mt-1">
+                                                <i class="fas fa-user mr-2"></i><?= htmlspecialchars($req['customerName'] ?? 'N/A') ?>
+                                                <span class="mx-2">•</span>
+                                                <i class="fas fa-tag mr-2"></i><?= htmlspecialchars($req['serviceType'] ?? 'N/A') ?>
+                                            </p>
+                                        </div>
+                                        <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                                            <?= htmlspecialchars($req['status'] ?? 'N/A') ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <?php if (!empty($req['description'])): ?>
+                                    <p class="text-gray-700 mb-3"><?= htmlspecialchars($req['description']) ?></p>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!empty($req['scheduledDate'])): ?>
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                                        <p class="text-sm text-blue-700">
+                                            <i class="fas fa-calendar-check mr-2"></i>
+                                            <strong>Lịch hẹn:</strong> <?= date('d/m/Y', strtotime($req['scheduledDate'])) ?>
+                                            <?php if (!empty($req['scheduledTimeSlot'])): ?>
+                                            <span class="mx-2">•</span>
+                                            <strong>Ca:</strong> <?= htmlspecialchars($req['scheduledTimeSlot']) ?>
+                                            <?php endif; ?>
+                                        </p>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <form method="POST" class="mt-4">
+                                        <input type="hidden" name="request_id" value="<?= $req['id'] ?>">
+                                        <div class="mb-3">
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Ghi chú phản hồi:</label>
+                                            <textarea name="notes" rows="3" 
+                                                      class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                                      placeholder="Nhập ghi chú phản hồi..."></textarea>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <select name="new_status" class="px-4 py-2 border border-gray-300 rounded-lg">
+                                                <option value="">Giữ nguyên trạng thái</option>
+                                                <option value="InProgress">InProgress</option>
+                                                <option value="Completed">Completed</option>
+                                            </select>
+                                            <button type="submit" name="respond_request" 
+                                                    class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition">
+                                                <i class="fas fa-paper-plane mr-2"></i>Phản hồi
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>

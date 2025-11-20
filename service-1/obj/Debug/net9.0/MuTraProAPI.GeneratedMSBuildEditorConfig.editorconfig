@@ -17,13 +17,21 @@ build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.RootNamespace = MuTraProAPI
 build_property.RootNamespace = MuTraProAPI
+<<<<<<< HEAD
 build_property.ProjectDir = D:\do_an\XDPM\service-1\
+=======
+build_property.ProjectDir = C:\Users\LENOVO\Desktop\test2\XDPM\service-1\
+>>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
 build_property.EnableComHosting = 
 build_property.EnableGeneratedComInterfaceComImportInterop = 
 build_property.RazorLangVersion = 9.0
 build_property.SupportLocalizedComponentNames = 
 build_property.GenerateRazorMetadataSourceChecksumAttributes = 
+<<<<<<< HEAD
 build_property.MSBuildProjectDirectory = D:\do_an\XDPM\service-1
+=======
+build_property.MSBuildProjectDirectory = C:\Users\LENOVO\Desktop\test2\XDPM\service-1
+>>>>>>> 73c57d5 (update: fix lỗi và tạo luồng)
 build_property._RazorSourceGeneratorDebug = 
 build_property.EffectiveAnalysisLevelStyle = 9.0
 build_property.EnableCodeStyleSeverity = 

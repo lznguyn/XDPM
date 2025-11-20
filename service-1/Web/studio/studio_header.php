@@ -119,7 +119,7 @@ document.getElementById('logoutBtn')?.addEventListener('click', async () => {
     const token = '<?php echo $_SESSION['token'] ?? ''; ?>';
 
     try {
-        const res = await fetch('http://localhost:5200/api/Auth/logout', {
+        const res = await fetch('http://localhost:8000/api/Auth/logout', {
             method: 'POST',
             headers: {
                 'Authorization': 'Bearer ' + token

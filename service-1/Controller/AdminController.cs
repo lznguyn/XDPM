@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MuTraProAPI.Models;
 using MuTraProAPI.Data;
 using Microsoft.AspNetCore.Authorization;
+using static MuTraProAPI.Models.ServiceRequest;
 
 namespace MuTraProAPI.Controllers
 {
@@ -320,16 +321,45 @@ namespace MuTraProAPI.Controllers
             if (request == null)
                 return NotFound();
 
-            if (request.Status != RequestStatus.Pending)
-                return BadRequest(new { message = "Only Pending requests can be accepted." });
+            if (request.Status != RequestStatus.Requested && request.Status != RequestStatus.Pending)
+                return BadRequest(new { message = "Only Requested or Pending requests can be accepted." });
 
-            request.Status = RequestStatus.InProgress;
+            // Admin chấp nhận → chuyển sang PendingReview
+            request.Status = RequestStatus.PendingReview;
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Service request accepted successfully.", status = request.Status.ToString() });
+            return Ok(new { 
+                message = "Yêu cầu của bạn đã được chấp nhận. Vui lòng chọn ngày gặp chuyên gia.", 
+                status = request.Status.ToString() 
+            });
         }
 
-        // POST: api/Admin/service-requests/{id}/schedule
+        // POST: api/Admin/service-requests/{id}/reject
+        [HttpPost("service-requests/{id}/reject")]
+        public async Task<IActionResult> RejectServiceRequest(int id, [FromBody] RejectServiceRequestDto? dto = null)
+        {
+            var request = await _context.ServiceRequests.FindAsync(id);
+            if (request == null)
+                return NotFound();
+
+            if (request.Status != RequestStatus.Requested && request.Status != RequestStatus.Pending)
+                return BadRequest(new { message = "Only Requested or Pending requests can be rejected." });
+
+            // Admin từ chối → chuyển sang Cancelled
+            request.Status = RequestStatus.Cancelled;
+            if (!string.IsNullOrEmpty(dto?.Reason))
+            {
+                request.MeetingNotes = $"Lý do từ chối: {dto.Reason}";
+            }
+            await _context.SaveChangesAsync();
+
+            return Ok(new { 
+                message = "Yêu cầu đã bị từ chối.", 
+                status = request.Status.ToString() 
+            });
+        }
+
+        // POST: api/Admin/service-requests/{id}/schedule (Legacy - kept for backward compatibility)
         [HttpPost("service-requests/{id}/schedule")]
         public async Task<IActionResult> ScheduleServiceRequest(int id, [FromBody] ScheduleServiceRequestDto dto)
         {
@@ -367,12 +397,12 @@ namespace MuTraProAPI.Controllers
             if (!isAvailable)
                 return BadRequest(new { message = "Selected time slot is not available. Specialist schedule is full." });
 
-            // Update request
+            // Update request - chuyển sang PendingMeetingConfirmation
             request.AssignedSpecialistId = dto.SpecialistId;
             request.ScheduledDate = dto.ScheduledDate;
             request.ScheduledTimeSlot = dto.TimeSlot;
             request.MeetingNotes = dto.MeetingNotes;
-            request.Status = RequestStatus.Assigned;
+            request.Status = RequestStatus.PendingMeetingConfirmation;
             await _context.SaveChangesAsync();
 
             // Update or create specialist schedule
@@ -405,7 +435,7 @@ namespace MuTraProAPI.Controllers
             schedule.UpdatedAt = DateTime.Now;
             await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Service request scheduled successfully." });
+            return Ok(new { message = "Service request scheduled successfully. Waiting for expert confirmation." });
         }
 
         // GET: api/Admin/specialists/{id}/schedule
@@ -637,6 +667,147 @@ namespace MuTraProAPI.Controllers
             public DateTime ScheduledDate { get; set; }
             public string TimeSlot { get; set; } = string.Empty; // "0-4", "6-10", "12-16", "18-22"
             public string? MeetingNotes { get; set; }
+        }
+
+        public class RejectServiceRequestDto
+        {
+            public string? Reason { get; set; }
+        }
+
+        // =====================================================
+        // SERVICE PRICE MANAGEMENT ENDPOINTS
+        // =====================================================
+
+        // GET: api/Admin/service-prices
+        [HttpGet("service-prices")]
+        public async Task<IActionResult> GetServicePrices()
+        {
+            var prices = await _context.ServicePrices
+                .OrderBy(sp => sp.ServiceType)
+                .Select(sp => new
+                {
+                    sp.Id,
+                    ServiceType = sp.ServiceType.ToString(),
+                    sp.Price,
+                    sp.UpdatedAt,
+                    sp.UpdatedBy
+                })
+                .ToListAsync();
+
+            // Nếu chưa có giá nào, khởi tạo giá mặc định
+            if (!prices.Any())
+            {
+                var defaultPrices = new List<ServicePrice>
+                {
+                    new ServicePrice { ServiceType = ServiceType.Transcription, Price = 50000 },
+                    new ServicePrice { ServiceType = ServiceType.Arrangement, Price = 50000 }
+                };
+                
+                _context.ServicePrices.AddRange(defaultPrices);
+                await _context.SaveChangesAsync();
+
+                return Ok(defaultPrices.Select(sp => new
+                {
+                    sp.Id,
+                    ServiceType = sp.ServiceType.ToString(),
+                    sp.Price,
+                    sp.UpdatedAt,
+                    sp.UpdatedBy
+                }));
+            }
+
+            return Ok(prices);
+        }
+
+        // GET: api/Admin/service-prices/{serviceType}
+        [HttpGet("service-prices/{serviceType}")]
+        public async Task<IActionResult> GetServicePrice(string serviceType)
+        {
+            if (!Enum.TryParse<ServiceType>(serviceType, true, out var serviceTypeEnum))
+            {
+                return BadRequest(new { message = "Invalid service type" });
+            }
+
+            var price = await _context.ServicePrices
+                .FirstOrDefaultAsync(sp => sp.ServiceType == serviceTypeEnum);
+
+            if (price == null)
+            {
+                // Tạo giá mặc định nếu chưa có
+                price = new ServicePrice
+                {
+                    ServiceType = serviceTypeEnum,
+                    Price = 50000 // Giá mặc định
+                };
+                _context.ServicePrices.Add(price);
+                await _context.SaveChangesAsync();
+            }
+
+            return Ok(new
+            {
+                price.Id,
+                ServiceType = price.ServiceType.ToString(),
+                price.Price,
+                price.UpdatedAt,
+                price.UpdatedBy
+            });
+        }
+
+        // PUT: api/Admin/service-prices/{serviceType}
+        [HttpPut("service-prices/{serviceType}")]
+        public async Task<IActionResult> UpdateServicePrice(string serviceType, [FromBody] UpdateServicePriceDto dto)
+        {
+            if (!Enum.TryParse<ServiceType>(serviceType, true, out var serviceTypeEnum))
+            {
+                return BadRequest(new { message = "Invalid service type" });
+            }
+
+            if (dto.Price < 0)
+            {
+                return BadRequest(new { message = "Price must be greater than or equal to 0" });
+            }
+
+            var price = await _context.ServicePrices
+                .FirstOrDefaultAsync(sp => sp.ServiceType == serviceTypeEnum);
+
+            if (price == null)
+            {
+                // Tạo mới nếu chưa có
+                price = new ServicePrice
+                {
+                    ServiceType = serviceTypeEnum,
+                    Price = dto.Price,
+                    UpdatedAt = DateTime.Now
+                };
+                _context.ServicePrices.Add(price);
+            }
+            else
+            {
+                price.Price = dto.Price;
+                price.UpdatedAt = DateTime.Now;
+                if (dto.UpdatedBy.HasValue)
+                {
+                    price.UpdatedBy = dto.UpdatedBy.Value;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Service price updated successfully",
+                price.Id,
+                ServiceType = price.ServiceType.ToString(),
+                price.Price,
+                price.UpdatedAt,
+                price.UpdatedBy
+            });
+        }
+
+        public class UpdateServicePriceDto
+        {
+            public decimal Price { get; set; }
+            public int? UpdatedBy { get; set; }
         }
     }
 }

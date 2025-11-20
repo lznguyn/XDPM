@@ -7,6 +7,11 @@ import { ConfirmPaymentDto } from './dto/confirm-payment.dto';
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
+  @Get()
+  findAll() {
+    return this.paymentService.getAllPayments();
+  }
+
   @Post()
   create(@Body() dto: CreatePaymentDto) {
     return this.paymentService.createPayment(dto);

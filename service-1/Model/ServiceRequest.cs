@@ -77,14 +77,18 @@ namespace MuTraProAPI.Models
 
     public enum RequestStatus
     {
+        Requested,              // Khách hàng gửi yêu cầu dịch vụ
+        PendingReview,         // Admin đã duyệt yêu cầu, chờ người dùng chọn ngày/chuyên gia
+        Cancelled,              // Yêu cầu bị từ chối hoặc bị hủy
+        PendingMeetingConfirmation, // Người dùng đã chọn ngày + khung giờ, đang chờ chuyên gia xác nhận
+        Completed,             // Chuyên gia chấp nhận gặp → yêu cầu hoàn thành, chờ thanh toán
+        RejectedByExpert,      // Chuyên gia từ chối gặp (với lý do)
+        // Legacy states (kept for backward compatibility)
         Pending,
         Submitted,
         Assigned,
         InProgress,
-        PendingReview,
-        Completed,
-        RevisionRequested,
-        Cancelled
+        RevisionRequested
     }
 }
 

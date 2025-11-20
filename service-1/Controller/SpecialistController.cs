@@ -25,7 +25,9 @@ namespace MuTraProAPI.Controllers
                 .Include(r => r.Customer)
                 .Include(r => r.AssignedSpecialist)
                 .Where(r => r.AssignedSpecialistId == specialistId && 
-                           (r.Status == RequestStatus.Assigned || r.Status == RequestStatus.InProgress))
+                           (r.Status == RequestStatus.Assigned || 
+                            r.Status == RequestStatus.InProgress ||
+                            r.Status == RequestStatus.PendingMeetingConfirmation))
                 .OrderByDescending(r => r.CreatedDate)
                 .Select(r => new
                 {
@@ -48,6 +50,109 @@ namespace MuTraProAPI.Controllers
                 .ToListAsync();
 
             return Ok(requests);
+        }
+
+        // GET: api/Specialist/pending-meetings
+        [HttpGet("pending-meetings")]
+        public async Task<IActionResult> GetPendingMeetings([FromQuery] int specialistId)
+        {
+            var requests = await _context.ServiceRequests
+                .Include(r => r.Customer)
+                .Where(r => r.AssignedSpecialistId == specialistId && 
+                           r.Status == RequestStatus.PendingMeetingConfirmation)
+                .OrderBy(r => r.ScheduledDate)
+                .Select(r => new
+                {
+                    r.Id,
+                    r.CustomerId,
+                    CustomerName = r.Customer != null ? r.Customer.Name : null,
+                    CustomerEmail = r.Customer != null ? r.Customer.Email : null,
+                    r.ServiceType,
+                    r.Title,
+                    r.Description,
+                    r.ScheduledDate,
+                    r.ScheduledTimeSlot,
+                    r.MeetingNotes,
+                    r.CreatedDate
+                })
+                .ToListAsync();
+
+            return Ok(requests);
+        }
+
+        // POST: api/Specialist/requests/{id}/accept-meeting
+        [HttpPost("requests/{id}/accept-meeting")]
+        public async Task<IActionResult> AcceptMeeting(int id)
+        {
+            var request = await _context.ServiceRequests.FindAsync(id);
+            if (request == null)
+                return NotFound(new { message = "Request not found" });
+
+            if (request.Status != RequestStatus.PendingMeetingConfirmation)
+                return BadRequest(new { message = "Chỉ có thể chấp nhận meeting khi ở trạng thái PendingMeetingConfirmation." });
+
+            // Chuyên gia chấp nhận → chuyển sang Completed
+            request.Status = RequestStatus.Completed;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { 
+                message = "Yêu cầu của bạn đã được hoàn thành. Vui lòng thanh toán.", 
+                status = request.Status.ToString() 
+            });
+        }
+
+        // POST: api/Specialist/requests/{id}/reject-meeting
+        [HttpPost("requests/{id}/reject-meeting")]
+        public async Task<IActionResult> RejectMeeting(int id, [FromBody] RejectMeetingDto? dto = null)
+        {
+            var request = await _context.ServiceRequests.FindAsync(id);
+            if (request == null)
+                return NotFound(new { message = "Request not found" });
+
+            if (request.Status != RequestStatus.PendingMeetingConfirmation)
+                return BadRequest(new { message = "Chỉ có thể từ chối meeting khi ở trạng thái PendingMeetingConfirmation." });
+
+            // Chuyên gia từ chối → chuyển sang RejectedByExpert hoặc Cancelled
+            request.Status = RequestStatus.RejectedByExpert;
+            if (!string.IsNullOrEmpty(dto?.Reason))
+            {
+                request.MeetingNotes = (request.MeetingNotes ?? "") + $"\nLý do từ chối: {dto.Reason}";
+            }
+
+            // Giải phóng time slot trong schedule
+            if (request.ScheduledDate.HasValue && request.AssignedSpecialistId.HasValue)
+            {
+                var schedule = await _context.SpecialistSchedules
+                    .FirstOrDefaultAsync(s => s.SpecialistId == request.AssignedSpecialistId.Value && 
+                                             s.Date.Date == request.ScheduledDate.Value.Date);
+                
+                if (schedule != null && !string.IsNullOrEmpty(request.ScheduledTimeSlot))
+                {
+                    switch (request.ScheduledTimeSlot)
+                    {
+                        case "0-4":
+                            schedule.TimeSlot1 = false;
+                            break;
+                        case "6-10":
+                            schedule.TimeSlot2 = false;
+                            break;
+                        case "12-16":
+                            schedule.TimeSlot3 = false;
+                            break;
+                        case "18-22":
+                            schedule.TimeSlot4 = false;
+                            break;
+                    }
+                    schedule.UpdatedAt = DateTime.Now;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new { 
+                message = $"Chuyên gia đã từ chối gặp{(dto?.Reason != null ? $", lý do: {dto.Reason}" : "")}.", 
+                status = request.Status.ToString() 
+            });
         }
 
         // PUT: api/Specialist/requests/{id}/respond
@@ -179,6 +284,11 @@ namespace MuTraProAPI.Controllers
             public bool TimeSlot2 { get; set; }
             public bool TimeSlot3 { get; set; }
             public bool TimeSlot4 { get; set; }
+        }
+
+        public class RejectMeetingDto
+        {
+            public string? Reason { get; set; }
         }
     }
 }

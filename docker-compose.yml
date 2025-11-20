@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # -------------------------
   # MySQL Database
@@ -40,6 +38,9 @@ services:
       - auth-service
       - customer-service
       - backend-service
+      # Không thêm payment-service và coordinator-service vào depends_on để tránh dependency cycle
+      # Kong chỉ cần biết các service tồn tại để route, không cần chờ chúng start
+      - postgres-db
 
   # -------------------------
   # Auth Service (.NET)
@@ -65,8 +66,8 @@ services:
     build:
       context: ./service-2/customer-service
     container_name: customer-service
-    ports:
-      - "8082:8001"
+    expose:
+      - "8001"
     environment:
       HOST: 0.0.0.0
       PORT: 8001
@@ -102,6 +103,108 @@ services:
     depends_on:
       - mysql
 
+  # -------------------------
+  # PostgreSQL Database for Service-3
+  # -------------------------
+  postgres-db:
+    image: postgres:16
+    container_name: postgres-db
+    environment:
+      POSTGRES_DB: mutrapro_db
+      POSTGRES_USER: mutrapro
+      POSTGRES_PASSWORD: mutrapro_pw
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./service-3/projectnew/mutrapro/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mutrapro"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # -------------------------
+  # Coordinator Service (NestJS)
+  # -------------------------
+  coordinator-service:
+    build:
+      context: ./service-3/projectnew/mutrapro/coordinator-service
+    container_name: coordinator-service
+    expose:
+      - "3000"
+    environment:
+      DB_HOST: postgres-db
+      DB_PORT: 5432
+      DB_USER: mutrapro
+      DB_PASS: mutrapro_pw
+      DB_NAME: mutrapro_db
+      PORT: 3000
+      NODE_ENV: development
+      AUTH_SERVICE_URL: http://auth-service:8081
+      PAYMENT_SERVICE_URL: http://payment-service:3001
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+
+  # -------------------------
+  # Payment Service (NestJS)
+  # -------------------------
+  payment-service:
+    build:
+      context: ./service-3/projectnew/mutrapro/payment-service
+    container_name: payment-service
+    expose:
+      - "3001"
+    environment:
+      DB_HOST: postgres-db
+      DB_PORT: 5432
+      DB_USER: mutrapro
+      DB_PASS: mutrapro_pw
+      DB_NAME: mutrapro_db
+      PORT: 3001
+      NODE_ENV: development
+      COORDINATOR_SERVICE_URL: http://coordinator-service:3000
+      CUSTOMER_SERVICE_URL: http://customer-service:8001
+      KONG_GATEWAY_URL: http://kong:8000
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      # Không thêm depends_on kong để tránh dependency cycle
+      # Kong sẽ được start trước vì nó không phụ thuộc vào payment-service
+
+  # -------------------------
+  # PHP Frontend Server (Admin Panel)
+  # -------------------------
+  php-frontend:
+    image: php:8.2-apache
+    container_name: php-frontend
+    ports:
+      - "8082:80"
+    volumes:
+      - ./service-1/Web:/var/www/html
+    depends_on:
+      - auth-service
+      - kong
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html
+
+  # -------------------------
+  # HTML Frontend Server (Customer Dashboard)
+  # -------------------------
+  frontend-server:
+    image: python:3.10-slim
+    container_name: frontend-server
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./service-2/frontend:/app
+    working_dir: /app
+    command: python -m http.server 8080
+    depends_on:
+      - customer-service
+      - payment-service
+
 # -------------------------
 # Volumes
 # -------------------------
@@ -109,3 +212,4 @@ volumes:
   mysql-data:
   backend-uploads:
   backend-outputs:
+  postgres-data:

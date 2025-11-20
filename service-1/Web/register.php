@@ -19,14 +19,8 @@ if(isset($_POST['submit'])){
     } elseif ($user_type === 'admin' && $admin_code !== 'admin123') {
         $messages[] = 'Mã xác nhận Admin không đúng!';
     } else {
-        // 🔹 Gọi API backend .NET
-        // Gọi API .NET qua Kong Gateway (hoặc trực tiếp auth-service)
-        // Option 1: Qua Kong Gateway (khuyến nghị)
+        // Gọi qua Kong Gateway
         $api_url = "http://localhost:8000/api/Auth/register";
-        // Option 2: Trực tiếp auth-service (nếu chạy Docker)
-        // $api_url = "http://localhost:8081/api/Auth/register";
-        // Option 3: Local .NET service (nếu chạy local)
-        // $api_url = "http://localhost:5200/api/Auth/register";
         $roleMap = [
             'admin' => 0,
             'user' => 1,
@@ -105,7 +99,7 @@ if(isset($_POST['submit'])){
                 <input type="password" name="password" id="passwordInput" placeholder="Nhập mật khẩu (tối thiểu 8 ký tự)" required minlength="8" class="w-full px-4 py-4 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent">
                 <input type="password" name="cpassword" id="confirmPasswordInput" placeholder="Nhập lại mật khẩu" required minlength="8" class="w-full px-4 py-4 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-xl text-white placeholder-blue-200 focus:ring-2 focus:ring-blue-400 focus:border-transparent">
 
-                <select name="role" onchange="toggleAdminCodeField(this)" class="w-full px-4 py-4 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-xl text-white focus:ring-2 focus:ring-blue-400 focus:border-transparent">
+                <select name="role" onchange="toggleAdminCodeField(this)" class="w-full px-4 py-4 bg-white bg-opacity-10 border border-white border-opacity-20 rounded-xl text-black focus:ring-2 focus:ring-blue-400 focus:border-transparent">
                     <option value="user">Người dùng</option>
                     <option value="admin">Quản trị viên</option>
                     <option value="coordinator">Điều phối viên</option>

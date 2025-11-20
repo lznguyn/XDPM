@@ -175,7 +175,7 @@ namespace MuTraProAPI.Controllers
                 Title = dto.Title,
                 Description = dto.Description,
                 FileName = dto.FileName,
-                Status = RequestStatus.Pending,
+                Status = RequestStatus.Requested, // Trạng thái ban đầu: Requested
                 CreatedDate = DateTime.Now,
                 DueDate = dto.DueDate,
                 Priority = dto.Priority ?? "normal",
@@ -283,6 +283,100 @@ namespace MuTraProAPI.Controllers
             return BadRequest(new { message = "Invalid status" });
         }
 
+        // POST: api/Customer/requests/{id}/select-expert
+        [HttpPost("requests/{id}/select-expert")]
+        public async Task<IActionResult> SelectExpertAndSchedule(int id, [FromBody] SelectExpertAndScheduleDto dto)
+        {
+            var request = await _context.ServiceRequests.FindAsync(id);
+            if (request == null)
+                return NotFound(new { message = "Request not found" });
+
+            // Chỉ cho phép khi request ở trạng thái PendingReview
+            if (request.Status != RequestStatus.PendingReview)
+                return BadRequest(new { message = "Chỉ có thể chọn chuyên gia khi yêu cầu ở trạng thái PendingReview." });
+
+            // Kiểm tra chuyên gia có tồn tại không
+            var specialist = await _context.Users.FindAsync(dto.SpecialistId);
+            if (specialist == null)
+                return NotFound(new { message = "Chuyên gia không tồn tại." });
+
+            // Kiểm tra lịch làm việc của chuyên gia
+            var schedule = await _context.SpecialistSchedules
+                .FirstOrDefaultAsync(s => s.SpecialistId == dto.SpecialistId && 
+                                         s.Date.Date == dto.ScheduledDate.Date);
+
+            // Kiểm tra ngày có phải là ngày làm việc của chuyên gia không
+            // (Có thể mở rộng logic này để kiểm tra working days)
+            // Tạm thời chỉ kiểm tra time slot có available không
+
+            bool isTimeSlotAvailable = false;
+            if (schedule != null)
+            {
+                // Kiểm tra time slot có trống không
+                isTimeSlotAvailable = dto.TimeSlot switch
+                {
+                    "0-4" => !schedule.TimeSlot1,
+                    "6-10" => !schedule.TimeSlot2,
+                    "12-16" => !schedule.TimeSlot3,
+                    "18-22" => !schedule.TimeSlot4,
+                    _ => false
+                };
+            }
+            else
+            {
+                // Không có schedule → tất cả time slot đều available
+                isTimeSlotAvailable = true;
+            }
+
+            if (!isTimeSlotAvailable)
+                return BadRequest(new { message = "Không thể gặp chuyên gia vào ngày/giờ này, vui lòng chọn lại." });
+
+            // Cập nhật request
+            request.AssignedSpecialistId = dto.SpecialistId;
+            request.ScheduledDate = dto.ScheduledDate;
+            request.ScheduledTimeSlot = dto.TimeSlot;
+            request.MeetingNotes = dto.MeetingNotes;
+            request.Status = RequestStatus.PendingMeetingConfirmation; // Chờ chuyên gia xác nhận
+            await _context.SaveChangesAsync();
+
+            // Cập nhật hoặc tạo specialist schedule
+            if (schedule == null)
+            {
+                schedule = new SpecialistSchedule
+                {
+                    SpecialistId = dto.SpecialistId,
+                    Date = dto.ScheduledDate.Date
+                };
+                _context.SpecialistSchedules.Add(schedule);
+            }
+
+            // Đánh dấu time slot đã được đặt
+            switch (dto.TimeSlot)
+            {
+                case "0-4":
+                    schedule.TimeSlot1 = true;
+                    break;
+                case "6-10":
+                    schedule.TimeSlot2 = true;
+                    break;
+                case "12-16":
+                    schedule.TimeSlot3 = true;
+                    break;
+                case "18-22":
+                    schedule.TimeSlot4 = true;
+                    break;
+            }
+            schedule.UpdatedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Đã chọn chuyên gia và ngày gặp. Đang chờ chuyên gia xác nhận.",
+                id = request.Id,
+                status = request.Status.ToString()
+            });
+        }
+
         // POST: api/Customer/feedback
         [HttpPost("feedback")]
         public async Task<IActionResult> SubmitFeedback([FromBody] CreateFeedbackDto dto)
@@ -338,16 +432,16 @@ namespace MuTraProAPI.Controllers
                 TransactionId = Guid.NewGuid().ToString()
             };
 
+            // Mark request as paid FIRST (before adding payment)
+            var request = await _context.ServiceRequests.FindAsync(dto.ServiceRequestId);
+            if (request == null)
+                return NotFound(new { message = "Service request not found" });
+
+            request.Paid = true; // Đảm bảo cập nhật paid status
+
             _context.CustomerPayments.Add(payment);
 
-            // Mark request as paid
-            var request = await _context.ServiceRequests.FindAsync(dto.ServiceRequestId);
-            if (request != null)
-            {
-                request.Paid = true;
-            }
-
-            // Save payment first to get the ID
+            // Save payment and paid status together
             await _context.SaveChangesAsync();
             
             // Reload payment to ensure we have the database-generated ID
@@ -366,6 +460,15 @@ namespace MuTraProAPI.Controllers
 
             _context.CustomerTransactions.Add(transaction);
             await _context.SaveChangesAsync();
+            
+            // Verify paid status was saved
+            await _context.Entry(request).ReloadAsync();
+            if (!request.Paid)
+            {
+                // If somehow paid wasn't saved, update it again
+                request.Paid = true;
+                await _context.SaveChangesAsync();
+            }
 
             return Ok(new
             {
@@ -450,6 +553,38 @@ namespace MuTraProAPI.Controllers
             public int ServiceRequestId { get; set; }
             public decimal Amount { get; set; }
             public string PaymentMethod { get; set; } = string.Empty;
+        }
+
+        public class SelectExpertAndScheduleDto
+        {
+            public int SpecialistId { get; set; }
+            public DateTime ScheduledDate { get; set; }
+            public string TimeSlot { get; set; } = string.Empty; // "0-4", "6-10", "12-16", "18-22"
+            public string? MeetingNotes { get; set; }
+        }
+
+        // PATCH: api/Customer/requests/{id}/paid
+        [HttpPatch("requests/{id}/paid")]
+        public async Task<IActionResult> UpdateRequestPaidStatus(int id, [FromBody] UpdatePaidStatusDto dto)
+        {
+            var request = await _context.ServiceRequests.FindAsync(id);
+            if (request == null)
+                return NotFound(new { message = "Request not found" });
+
+            request.Paid = dto.Paid;
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                id = request.Id,
+                paid = request.Paid,
+                message = "Paid status updated successfully"
+            });
+        }
+
+        public class UpdatePaidStatusDto
+        {
+            public bool Paid { get; set; }
         }
     }
 }

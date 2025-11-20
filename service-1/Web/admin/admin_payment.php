@@ -2,13 +2,14 @@
 session_start();
 
 // Nếu chưa đăng nhập Admin
-if (!isset($_SESSION['admin_id'])) {
+$admin_id = $_SESSION['user']['id'] ?? null;
+if (!$admin_id) {
     header('location:login.php');
     exit();
 }
 
-// API base URL
-$apiBase = "http://localhost:5200/api/Admin";
+// API base URL - Gọi qua Kong Gateway
+$apiBase = "http://localhost:8000/api/Admin";
 
 // ✅ Hàm gọi API
 function callApi($url, $method = 'GET', $data = null)

@@ -8,7 +8,7 @@ if (!$admin_id) {
     exit();
 }
 
-// API base URL - Sử dụng Kong Gateway
+// API base URL - Gọi qua Kong Gateway
 $apiBase = "http://localhost:8000/api/Admin";
 $token = $_SESSION['token'] ?? '';
 
@@ -54,9 +54,9 @@ if ($res['code'] != 200) {
     }
     error_log($apiError);
     
-    // Nếu lỗi, thử gọi trực tiếp auth-service
+    // Nếu lỗi, thử gọi lại qua gateway
     if ($res['code'] == 404 || $res['code'] == 500) {
-        $directRes = callApi("http://localhost:8081/api/Admin/users", "GET", null, $token);
+        $directRes = callApi("http://localhost:8000/api/Admin/users", "GET", null, $token);
         if ($directRes['code'] == 200) {
             $users = $directRes['body'] ?? [];
             $apiError = null; // Clear error if direct call succeeded

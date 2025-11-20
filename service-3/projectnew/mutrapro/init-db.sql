@@ -3,6 +3,9 @@
 -- PostgreSQL for Service-3 (Coordinator + Payment)
 -- =====================================================
 
+-- Note: This script runs in the database specified by POSTGRES_DB (mutrapro_db)
+-- If you need to create schemas in a different database, connect to that database first
+
 -- Create schemas
 CREATE SCHEMA IF NOT EXISTS coordinator;
 CREATE SCHEMA IF NOT EXISTS payment;

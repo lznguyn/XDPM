@@ -12,13 +12,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } elseif (strlen($pass) < 8) {
         $message[] = 'Mật khẩu phải có ít nhất 8 ký tự!';
     } else {
-        // Gọi API .NET qua Kong Gateway (hoặc trực tiếp auth-service)
-        // Option 1: Qua Kong Gateway (khuyến nghị)
+        // Gọi qua Kong Gateway
         $api_url = "http://localhost:8000/api/Auth/login";
-        // Option 2: Trực tiếp auth-service (nếu chạy Docker)
-        // $api_url = "http://localhost:8081/api/Auth/login";
-        // Option 3: Local .NET service (nếu chạy local)
-        // $api_url = "http://localhost:5200/api/Auth/login";
 
         $data = json_encode([
             "email" => $email,
@@ -39,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         curl_close($ch);
 
         // Xử lý phản hồi từ API
-        if ($http_code == 200) S{
+        if ($http_code == 200) {
             $result = json_decode($response, true);
 
             // Lưu token + user info vào session
@@ -87,11 +82,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     header('Location: ' . $redirect_url);
                     exit();
                     break;
+                case 'studio':
+                    // Studio role redirect đến studio_page.php
+                    header('Location: studio/studio_page.php');
+                    break;
                 case 'coordinator':
                 case 'arrangement':
                 case 'transcription':
                 case 'recorder':
-                    // Tất cả chuyên gia đều redirect đến arrangement_page.php
+                
+            
+                    // Các chuyên gia khác redirect đến arrangement_page.php
                     header('Location: arrangement/arrangement_page.php');
                     break;
                 case 'studio':

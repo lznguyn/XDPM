@@ -24,8 +24,11 @@ echo ✅ PHP found!
 echo.
 echo Starting PHP development server...
 echo.
-echo 📍 Login page: http://localhost:8082/login.php
-echo 📍 Register page: http://localhost:8082/register.php
+echo 📁 Serving from: %CD%
+echo 🌐 Server running at: http://localhost:8082
+echo 🔐 Login page: http://localhost:8082/login.php
+echo 📝 Register page: http://localhost:8082/register.php
+echo 👤 Admin Panel: http://localhost:8082/admin/admin_page.php
 echo.
 echo Press Ctrl+C to stop the server.
 echo.

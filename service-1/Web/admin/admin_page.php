@@ -88,7 +88,7 @@ async function loadStats() {
         return; 
     }
     try {
-        const res = await fetch('http://localhost:5200/api/Admin/stats', {
+        const res = await fetch('http://localhost:8000/api/Admin/stats', {
             headers: { 
                 'Authorization': 'Bearer ' + token
             }
