@@ -74,19 +74,40 @@ class DatabaseClient:
                                     due_date: Optional[str] = None, priority: str = "normal",
                                     status: Optional[str] = "pending") -> Dict[str, Any]:
         """Create a new service request"""
+        # Capitalize status properly
+        status_value = "Pending"
+        if status:
+            status_value = status.capitalize() if status.lower() == "pending" else status
+        
         data = {
             "customerId": customer_id,
-            "serviceType": service_type,
+            "serviceType": service_type,  # Should be "Recording", "Transcription", or "Arrangement"
             "title": title,
             "description": description,
             "fileName": file_name,
             "dueDate": due_date,
             "priority": priority,
-            "status": status  # Thêm status vào request
+            "status": status_value
         }
-        response = await self.client.post(f"{self.base_url}/requests", json=data)
-        response.raise_for_status()
-        return response.json()
+        
+        # Log the data being sent for debugging
+        print(f"Creating service request with data: {data}")
+        
+        try:
+            response = await self.client.post(f"{self.base_url}/requests", json=data)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            # Log detailed error for debugging
+            error_detail = "Unknown error"
+            try:
+                error_json = e.response.json()
+                error_detail = f"Status: {e.response.status_code}, Detail: {error_json}"
+            except:
+                error_detail = f"Status: {e.response.status_code}, Text: {e.response.text[:500]}"
+            print(f"Error creating service request: {error_detail}")
+            print(f"Request data was: {data}")
+            raise
     
     async def get_service_request(self, request_id: int) -> Optional[Dict[str, Any]]:
         """Get service request by ID"""

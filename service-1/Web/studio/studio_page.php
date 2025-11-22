@@ -11,6 +11,8 @@ if (!$studio_id || strtolower($studio_role) !== 'studio') {
 $message = [];
 // Gọi qua Kong Gateway đến customer-service
 $api_url = "http://localhost:8000/studios"; // API endpoint qua gateway
+$booking_api_url = "http://localhost:8000/api/StudioBooking"; // API endpoint cho booking
+$token = $_SESSION['token'] ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -50,20 +52,41 @@ $api_url = "http://localhost:8000/studios"; // API endpoint qua gateway
         <div id="addMessage" class="mt-2 text-green-600"></div>
     </div>
 
-    <div class="bg-white rounded-2xl shadow-sm border p-6">
-        <h2 class="text-xl font-bold text-gray-900 mb-4">Danh sách chuyên gia</h2>
+    <div class="bg-white rounded-2xl shadow-sm border p-6 mb-8">
+        <h2 class="text-xl font-bold text-gray-900 mb-4">Danh sách studio</h2>
         <div id="expertsList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <!-- Danh sách chuyên gia sẽ load bằng JS -->
+            <!-- Danh sách studio sẽ load bằng JS -->
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold text-gray-900">Yêu cầu đặt phòng</h2>
+            <button onclick="loadBookingRequests()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">
+                <i class="fas fa-sync-alt mr-2"></i>Làm mới
+            </button>
+        </div>
+        <div id="bookingRequestsList" class="space-y-4">
+            <!-- Danh sách yêu cầu đặt phòng sẽ load bằng JS -->
         </div>
     </div>
 </div>
 
 <script>
 const apiUrl = '<?php echo $api_url; ?>';
+const bookingApiUrl = '<?php echo $booking_api_url; ?>';
+const token = '<?php echo $token; ?>';
 
 // ===== Load danh sách chuyên gia =====
 async function loadExperts() {
     try {
+        // Kiểm tra và cập nhật trạng thái studio trước khi load
+        try {
+            await fetch(bookingApiUrl + '/check-dates');
+        } catch (e) {
+            console.warn('Không thể gọi check-dates:', e);
+        }
+        
         const res = await fetch(apiUrl);
         const data = await res.json();
         const container = document.getElementById('expertsList');
@@ -175,12 +198,138 @@ function editExpert(id) {
     window.location.href = `studio_edit.php?id=${id}`;
 }
 
+// ===== Load danh sách yêu cầu đặt phòng =====
+async function loadBookingRequests() {
+    try {
+        // Kiểm tra và cập nhật trạng thái studio trước khi load
+        try {
+            await fetch(bookingApiUrl + '/check-dates');
+        } catch (e) {
+            console.warn('Không thể gọi check-dates:', e);
+        }
+        
+        const res = await fetch(bookingApiUrl + '/requests', {
+            headers: {
+                'Authorization': 'Bearer ' + token
+            }
+        });
+        const data = await res.json();
+        const container = document.getElementById('bookingRequestsList');
+        container.innerHTML = '';
+        
+        if (!data.data || data.data.length === 0) {
+            container.innerHTML = '<p class="text-gray-500 text-center py-8">Chưa có yêu cầu đặt phòng nào</p>';
+            return;
+        }
+        
+        data.data.forEach(booking => {
+            const statusMap = {
+                'Pending': { text: 'Chờ phê duyệt', color: 'bg-yellow-100 text-yellow-800' },
+                'Approved': { text: 'Đã phê duyệt', color: 'bg-green-100 text-green-800' },
+                'Rejected': { text: 'Đã từ chối', color: 'bg-red-100 text-red-800' },
+                'Completed': { text: 'Đã hoàn thành', color: 'bg-blue-100 text-blue-800' }
+            };
+            const statusInfo = statusMap[booking.status] || { text: booking.status, color: 'bg-gray-100 text-gray-800' };
+            const bookingDate = new Date(booking.booking_date).toLocaleDateString('vi-VN');
+            
+            container.innerHTML += `
+            <div class="border rounded-xl p-4 hover:shadow-md transition-all">
+                <div class="flex justify-between items-start mb-3">
+                    <div class="flex-1">
+                        <h3 class="font-bold text-gray-900 text-lg mb-1">${booking.studio_name || 'Studio #' + booking.studio_id}</h3>
+                        <p class="text-gray-600 text-sm mb-1"><i class="fas fa-user mr-2"></i>Khách hàng: ${booking.customer_name || 'N/A'} (${booking.customer_email || 'N/A'})</p>
+                        <p class="text-gray-600 text-sm mb-1"><i class="fas fa-calendar mr-2"></i>Ngày đặt: ${bookingDate}</p>
+                        <p class="text-gray-600 text-sm mb-1"><i class="fas fa-clock mr-2"></i>Giờ đặt: ${booking.booking_time || 'N/A'}</p>
+                        ${booking.notes ? `<p class="text-gray-600 text-sm mb-1"><i class="fas fa-sticky-note mr-2"></i>Ghi chú: ${booking.notes}</p>` : ''}
+                        ${booking.approved_date ? `<p class="text-gray-500 text-xs mt-1">Phê duyệt: ${new Date(booking.approved_date).toLocaleString('vi-VN')}</p>` : ''}
+                    </div>
+                    <div class="ml-4">
+                        <span class="px-3 py-1 rounded-full text-sm font-semibold ${statusInfo.color}">${statusInfo.text}</span>
+                    </div>
+                </div>
+                ${booking.status === 'Pending' ? `
+                <div class="flex space-x-2 mt-3">
+                    <button onclick="approveBooking(${booking.id})" class="flex-1 bg-green-500 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-600">
+                        <i class="fas fa-check mr-2"></i>Phê duyệt
+                    </button>
+                    <button onclick="rejectBooking(${booking.id})" class="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600">
+                        <i class="fas fa-times mr-2"></i>Từ chối
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+            `;
+        });
+    } catch (error) {
+        console.error('Error loading booking requests:', error);
+        const container = document.getElementById('bookingRequestsList');
+        container.innerHTML = '<p class="text-red-500 text-center py-8">Lỗi tải danh sách yêu cầu đặt phòng</p>';
+    }
+}
+
+// ===== Phê duyệt yêu cầu đặt phòng =====
+async function approveBooking(bookingId) {
+    if (!confirm('Bạn có chắc muốn phê duyệt yêu cầu đặt phòng này?')) return;
+    
+    try {
+        const res = await fetch(bookingApiUrl + '/' + bookingId + '/approve', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            }
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            alert(data.message || 'Đã phê duyệt yêu cầu thành công!');
+            loadBookingRequests();
+            loadExperts(); // Refresh danh sách studio
+        } else {
+            alert('Lỗi: ' + (data.message || 'Không thể phê duyệt yêu cầu'));
+        }
+    } catch (error) {
+        console.error('Error approving booking:', error);
+        alert('Lỗi: ' + error.message);
+    }
+}
+
+// ===== Từ chối yêu cầu đặt phòng =====
+async function rejectBooking(bookingId) {
+    const reason = prompt('Vui lòng nhập lý do từ chối (tùy chọn):');
+    if (reason === null) return; // User cancelled
+    
+    try {
+        const res = await fetch(bookingApiUrl + '/' + bookingId + '/reject', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ reason: reason || '' })
+        });
+        const data = await res.json();
+        
+        if (res.ok) {
+            alert(data.message || 'Đã từ chối yêu cầu thành công!');
+            loadBookingRequests();
+        } else {
+            alert('Lỗi: ' + (data.message || 'Không thể từ chối yêu cầu'));
+        }
+    } catch (error) {
+        console.error('Error rejecting booking:', error);
+        alert('Lỗi: ' + error.message);
+    }
+}
+
 // Load khi trang được mở
 loadExperts();
+loadBookingRequests();
 
-// Auto-refresh danh sách studio mỗi 10 giây để cập nhật status
+// Auto-refresh danh sách studio và booking requests mỗi 10 giây để cập nhật status
 setInterval(() => {
     loadExperts();
+    loadBookingRequests();
 }, 10000); // Refresh mỗi 10 giây
 </script>
 </body>

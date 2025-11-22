@@ -13,6 +13,7 @@ from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import uvicorn
+import httpx
 from db_client import db_client
 
 # ============================================================================
@@ -237,7 +238,7 @@ async def create_service_request(
     title: str = Form(...),
     description: Optional[str] = Form(None),
     due_date: Optional[str] = Form(None),
-    status: Optional[str] = Form("pending"),  # Mặc định là "pending"
+    status: Optional[str] = Form("pending"), 
     file: Optional[UploadFile] = File(None)
 ):
     """Submit new service request (transcription, arrangement, recording)"""
@@ -266,9 +267,13 @@ async def create_service_request(
                 pass
         
         # Create service request via API
+        # service_type.value will be "recording", "transcription", or "arrangement" (lowercase)
+        # But C# enum expects capitalized version, so convert it
+        service_type_str = service_type.value.capitalize()  # "recording" -> "Recording"
+        
         request = await db_client.create_service_request(
             customer_id=int(customer_id),
-            service_type=service_type.value,
+            service_type=service_type_str,
             title=title,
             description=description,
             file_name=file_name,
@@ -293,7 +298,19 @@ async def create_service_request(
         }
     except HTTPException:
         raise
+    except httpx.HTTPStatusError as e:
+        # Forward HTTP errors from auth-service with more details
+        error_detail = str(e)
+        try:
+            error_json = e.response.json()
+            error_detail = error_json.get("message") or error_json.get("detail") or str(error_json)
+        except:
+            error_detail = e.response.text[:500] if e.response.text else str(e)
+        raise HTTPException(status_code=e.response.status_code, detail=error_detail)
     except Exception as e:
+        import traceback
+        print(f"Unexpected error in create_service_request: {e}")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/requests/customer/{customer_id}")

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MuTraProAPI.Data;
 using MuTraProAPI.Models;
+using MuTraProAPI.Helpers;
 using System.IO;
 
 namespace MuTraProAPI.Controllers
@@ -23,6 +24,9 @@ namespace MuTraProAPI.Controllers
         [HttpGet]
         public async Task<IActionResult> GetStuido()
         {
+            // Logic check và update studio status đã được xử lý trong StudioBookingController
+            // Frontend sẽ gọi /api/StudioBooking/check-dates trước khi load danh sách studio
+            
             var experts = await _context.Studios.ToListAsync();
             return Ok(new { status = "success", message = "Lấy danh sách studio thành công", data = experts });
         }

@@ -96,12 +96,21 @@ let notifications = [];
 let notificationPollInterval = null;
 
 async function loadNotifications() {
+    if (!currentCustomerId) {
+        console.warn('Cannot load notifications: currentCustomerId is not set');
+        return;
+    }
+    
     try {
         const response = await fetch(`${API_BASE}/api/Notification/customer/${currentCustomerId}`);
         if (response.ok) {
             notifications = await response.json();
             renderNotifications();
             updateNotificationBadge();
+        } else {
+            console.error('Failed to load notifications:', response.status, response.statusText);
+            const errorText = await response.text();
+            console.error('Error response:', errorText);
         }
     } catch (error) {
         console.error('Error loading notifications:', error);
@@ -109,11 +118,17 @@ async function loadNotifications() {
 }
 
 async function getUnreadCount() {
+    if (!currentCustomerId) {
+        return 0;
+    }
+    
     try {
         const response = await fetch(`${API_BASE}/api/Notification/customer/${currentCustomerId}/unread-count`);
         if (response.ok) {
             const data = await response.json();
             return data.count || 0;
+        } else {
+            console.error('Failed to get unread count:', response.status, response.statusText);
         }
     } catch (error) {
         console.error('Error getting unread count:', error);
@@ -125,25 +140,38 @@ function renderNotifications() {
     const list = document.getElementById('notificationList');
     if (!list) return;
 
-    if (notifications.length === 0) {
+    if (!notifications || notifications.length === 0) {
         list.innerHTML = '<div class="notification-empty">Không có thông báo nào</div>';
         return;
     }
 
     list.innerHTML = notifications.map(notif => {
+        // Hỗ trợ cả camelCase và PascalCase để tương thích
+        const type = notif.type || notif.Type || 'Info';
+        const isRead = notif.isRead !== undefined ? notif.isRead : (notif.IsRead !== undefined ? notif.IsRead : false);
+        const id = notif.id || notif.Id;
+        const title = notif.title || notif.Title || '';
+        const message = notif.message || notif.Message || '';
+        const createdAt = notif.createdAt || notif.CreatedAt;
+        
         const typeIcon = {
             'Info': 'ℹ️',
+            'info': 'ℹ️',
             'Success': '✅',
+            'success': '✅',
             'Warning': '⚠️',
+            'warning': '⚠️',
             'Error': '❌',
-            'StatusChange': '🔄'
-        }[notif.type] || '📢';
+            'error': '❌',
+            'StatusChange': '🔄',
+            'statusChange': '🔄'
+        }[type] || '📢';
 
         return `
-            <div class="notification-item ${notif.isRead ? '' : 'unread'}" onclick="markAsRead(${notif.id})">
-                <div class="notification-item-title">${typeIcon} ${notif.title}</div>
-                <div class="notification-item-message">${notif.message}</div>
-                <div class="notification-item-time">${formatVietnamDate(notif.createdAt, 'datetime')}</div>
+            <div class="notification-item ${isRead ? '' : 'unread'}" onclick="markAsRead(${id})">
+                <div class="notification-item-title">${typeIcon} ${title}</div>
+                <div class="notification-item-message">${message}</div>
+                <div class="notification-item-time">${formatVietnamDate(createdAt, 'datetime')}</div>
             </div>
         `;
     }).join('');
@@ -173,17 +201,22 @@ function toggleNotifications() {
 }
 
 async function markAsRead(notificationId) {
+    if (!notificationId) return;
+    
     try {
         const response = await fetch(`${API_BASE}/api/Notification/${notificationId}/read`, {
             method: 'PATCH'
         });
         if (response.ok) {
-            const notif = notifications.find(n => n.id === notificationId);
+            const notif = notifications.find(n => (n.id || n.Id) === notificationId);
             if (notif) {
                 notif.isRead = true;
+                notif.IsRead = true;
                 renderNotifications();
                 updateNotificationBadge();
             }
+        } else {
+            console.error('Failed to mark notification as read:', response.status, response.statusText);
         }
     } catch (error) {
         console.error('Error marking notification as read:', error);
@@ -191,14 +224,24 @@ async function markAsRead(notificationId) {
 }
 
 async function markAllAsRead() {
+    if (!currentCustomerId) {
+        console.warn('Cannot mark all as read: currentCustomerId is not set');
+        return;
+    }
+    
     try {
         const response = await fetch(`${API_BASE}/api/Notification/customer/${currentCustomerId}/read-all`, {
             method: 'PATCH'
         });
         if (response.ok) {
-            notifications.forEach(n => n.isRead = true);
+            notifications.forEach(n => {
+                n.isRead = true;
+                n.IsRead = true;
+            });
             renderNotifications();
             updateNotificationBadge();
+        } else {
+            console.error('Failed to mark all as read:', response.status, response.statusText);
         }
     } catch (error) {
         console.error('Error marking all as read:', error);
@@ -206,11 +249,24 @@ async function markAllAsRead() {
 }
 
 function startNotificationPolling() {
+    if (!currentCustomerId) {
+        console.warn('Cannot start notification polling: currentCustomerId is not set');
+        return;
+    }
+    
+    // Load ngay lập tức
     loadNotifications();
     updateNotificationBadge();
+    
+    // Polling mỗi 30 giây
+    if (notificationPollInterval) {
+        clearInterval(notificationPollInterval);
+    }
     notificationPollInterval = setInterval(() => {
-        loadNotifications();
-        updateNotificationBadge();
+        if (currentCustomerId) {
+            loadNotifications();
+            updateNotificationBadge();
+        }
     }, 30000);
 }
 
@@ -242,6 +298,7 @@ if (urlCustomerId) {
     window.history.replaceState({}, document.title, window.location.pathname);
 }
 
+// Khởi tạo currentCustomerId sau khi xử lý URL parameters
 let currentCustomerId = localStorage.getItem('customerId');
 let currentCustomerName = localStorage.getItem('customerName');
 
@@ -251,6 +308,10 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 function initializeApp() {
+    // Đảm bảo currentCustomerId được cập nhật từ localStorage
+    currentCustomerId = localStorage.getItem('customerId');
+    currentCustomerName = localStorage.getItem('customerName');
+    
     if (!currentCustomerId) {
         window.location.href = "auth.html";
     } else {
@@ -275,6 +336,10 @@ function updateCustomerDisplay() {
 }
 
 // ==================== TAB SWITCHING ====================
+// Auto-refresh intervals for tracking and payments tabs
+let requestsRefreshInterval = null;
+let paymentsRefreshInterval = null;
+
 function switchTab(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
@@ -303,10 +368,32 @@ function switchTab(tabName, event) {
         });
     }
 
+    // Clear existing intervals
+    if (requestsRefreshInterval) {
+        clearInterval(requestsRefreshInterval);
+        requestsRefreshInterval = null;
+    }
+    if (paymentsRefreshInterval) {
+        clearInterval(paymentsRefreshInterval);
+        paymentsRefreshInterval = null;
+    }
+
     if (tabName === 'dashboard') loadDashboard();
-    if (tabName === 'tracking') loadRequests();
+    if (tabName === 'tracking') {
+        loadRequests();
+        // Auto-refresh requests every 10 seconds when tracking tab is active
+        requestsRefreshInterval = setInterval(() => {
+            loadRequests();
+        }, 10000);
+    }
     if (tabName === 'history') loadHistory();
-    if (tabName === 'payments') loadPayments();
+    if (tabName === 'payments') {
+        loadPayments();
+        // Auto-refresh payments every 10 seconds when payments tab is active
+        paymentsRefreshInterval = setInterval(() => {
+            loadPayments();
+        }, 10000);
+    }
     if (tabName === 'feedback') loadFeedback();
     if (tabName === 'studios') loadStudios();
 }
@@ -1092,6 +1179,13 @@ let selectedStudio = null;
 
 async function loadStudios() {
     try {
+        // Kiểm tra và cập nhật trạng thái studio trước khi load
+        try {
+            await fetch(`${API_BASE}/api/StudioBooking/check-dates`);
+        } catch (e) {
+            console.warn('Không thể gọi check-dates:', e);
+        }
+        
         const response = await fetch(`${API_BASE}/studios`);
         if (!response.ok) throw new Error('Không thể tải danh sách studio');
         
@@ -1282,25 +1376,7 @@ async function bookStudio() {
 
         showMessage(messageDiv, '<div class="loading"><div class="spinner"></div> Đang xử lý đặt studio...</div>', 'info');
         
-        try {
-            const updateResponse = await fetch(`${API_BASE}/studios/${selectedStudio.id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: selectedStudio.name,
-                    location: selectedStudio.location,
-                    price: selectedStudio.price,
-                    status: 2,
-                    image: selectedStudio.image
-                })
-            });
-            if (updateResponse.ok) {
-                console.log('Studio status updated to UnderMaintenance (2)');
-            }
-        } catch (e) {
-            console.error('Error updating studio status:', e);
-        }
-
+        // Không đổi studio status ngay - để studio phê duyệt trước
         const response = await fetch(`${API_BASE}/requests`, {
             method: 'POST',
             body: formData

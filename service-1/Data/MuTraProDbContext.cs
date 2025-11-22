@@ -11,6 +11,7 @@ namespace MuTraProAPI.Data
         public DbSet<Product> Products { get; set; }
         public DbSet<MusicSubmission> MusicSubmissions { get; set; }
         public DbSet<Studio> Studios { get; set; }
+        public DbSet<StudioBooking> StudioBookings { get; set; }
         
         // Customer Service Tables
         public DbSet<Customer> Customers { get; set; }
@@ -61,6 +62,11 @@ namespace MuTraProAPI.Data
             // Notification Enum Conversion
             modelBuilder.Entity<Notification>()
                 .Property(n => n.Type)
+                .HasConversion<string>();
+            
+            // StudioBooking Enum Conversion
+            modelBuilder.Entity<StudioBooking>()
+                .Property(b => b.Status)
                 .HasConversion<string>();
         }
     }

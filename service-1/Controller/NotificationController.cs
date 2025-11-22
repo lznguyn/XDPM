@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MuTraProAPI.Models;
 using MuTraProAPI.Data;
 using MuTraProAPI.Helpers;
+using System;
 
 namespace MuTraProAPI.Controllers
 {
@@ -21,78 +22,106 @@ namespace MuTraProAPI.Controllers
         [HttpGet("customer/{customerId}")]
         public async Task<IActionResult> GetCustomerNotifications(int customerId, [FromQuery] bool? unreadOnly = false)
         {
-            IQueryable<Notification> query = _context.Notifications
-                .Where(n => n.CustomerId == customerId)
-                .Include(n => n.ServiceRequest);
-
-            if (unreadOnly == true)
+            try
             {
-                query = query.Where(n => !n.IsRead);
-            }
+                IQueryable<Notification> query = _context.Notifications
+                    .Where(n => n.CustomerId == customerId)
+                    .Include(n => n.ServiceRequest);
 
-            var notifications = await query
-                .OrderByDescending(n => n.CreatedAt)
-                .Select(n => new
+                if (unreadOnly == true)
                 {
-                    n.Id,
-                    n.CustomerId,
-                    ServiceRequestId = n.ServiceRequestId,
-                    ServiceRequestTitle = n.ServiceRequest != null ? n.ServiceRequest.Title : null,
-                    n.Title,
-                    n.Message,
-                    n.Type,
-                    n.IsRead,
-                    n.CreatedAt,
-                    n.ReadAt
-                })
-                .ToListAsync();
+                    query = query.Where(n => !n.IsRead);
+                }
 
-            return Ok(notifications);
+                var notifications = await query
+                    .OrderByDescending(n => n.CreatedAt)
+                    .Select(n => new
+                    {
+                        n.Id,
+                        n.CustomerId,
+                        ServiceRequestId = n.ServiceRequestId,
+                        ServiceRequestTitle = n.ServiceRequest != null ? n.ServiceRequest.Title : null,
+                        n.Title,
+                        n.Message,
+                        n.Type,
+                        n.IsRead,
+                        n.CreatedAt,
+                        n.ReadAt
+                    })
+                    .ToListAsync();
+
+                return Ok(notifications);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error loading notifications", error = ex.Message });
+            }
         }
 
         // GET: api/Notification/customer/{customerId}/unread-count
         [HttpGet("customer/{customerId}/unread-count")]
         public async Task<IActionResult> GetUnreadCount(int customerId)
         {
-            var count = await _context.Notifications
-                .Where(n => n.CustomerId == customerId && !n.IsRead)
-                .CountAsync();
+            try
+            {
+                var count = await _context.Notifications
+                    .Where(n => n.CustomerId == customerId && !n.IsRead)
+                    .CountAsync();
 
-            return Ok(new { count });
+                return Ok(new { count });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error getting unread count", error = ex.Message, count = 0 });
+            }
         }
 
         // PATCH: api/Notification/{id}/read
         [HttpPatch("{id}/read")]
         public async Task<IActionResult> MarkAsRead(int id)
         {
-            var notification = await _context.Notifications.FindAsync(id);
-            if (notification == null)
-                return NotFound();
+            try
+            {
+                var notification = await _context.Notifications.FindAsync(id);
+                if (notification == null)
+                    return NotFound(new { message = "Notification not found" });
 
-            notification.IsRead = true;
-            notification.ReadAt = DateTimeHelper.Now;
-            await _context.SaveChangesAsync();
+                notification.IsRead = true;
+                notification.ReadAt = DateTimeHelper.Now;
+                await _context.SaveChangesAsync();
 
-            return Ok(new { message = "Notification marked as read" });
+                return Ok(new { message = "Notification marked as read" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error marking notification as read", error = ex.Message });
+            }
         }
 
         // PATCH: api/Notification/customer/{customerId}/read-all
         [HttpPatch("customer/{customerId}/read-all")]
         public async Task<IActionResult> MarkAllAsRead(int customerId)
         {
-            var notifications = await _context.Notifications
-                .Where(n => n.CustomerId == customerId && !n.IsRead)
-                .ToListAsync();
-
-            foreach (var notification in notifications)
+            try
             {
-                notification.IsRead = true;
-                notification.ReadAt = DateTimeHelper.Now;
+                var notifications = await _context.Notifications
+                    .Where(n => n.CustomerId == customerId && !n.IsRead)
+                    .ToListAsync();
+
+                foreach (var notification in notifications)
+                {
+                    notification.IsRead = true;
+                    notification.ReadAt = DateTimeHelper.Now;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return Ok(new { message = "All notifications marked as read", count = notifications.Count });
             }
-
-            await _context.SaveChangesAsync();
-
-            return Ok(new { message = "All notifications marked as read", count = notifications.Count });
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error marking all notifications as read", error = ex.Message });
+            }
         }
 
         // POST: api/Notification

@@ -196,6 +196,111 @@ namespace MuTraProAPI.Controllers
             _context.ServiceRequests.Add(request);
             await _context.SaveChangesAsync();
 
+            // Kiểm tra nếu đây là yêu cầu đặt studio (Recording service với [STUDIO_BOOKING] tag)
+            if (request.ServiceType == ServiceType.Recording && 
+                !string.IsNullOrEmpty(request.Description) &&
+                request.Description.Contains("[STUDIO_BOOKING]"))
+            {
+                try
+                {
+                    // Parse booking info từ description
+                    var startTag = "[STUDIO_BOOKING]";
+                    var endTag = "[/STUDIO_BOOKING]";
+                    var startIndex = request.Description.IndexOf(startTag);
+                    var endIndex = request.Description.IndexOf(endTag);
+
+                    if (startIndex >= 0 && endIndex > startIndex)
+                    {
+                        var jsonStr = request.Description.Substring(
+                            startIndex + startTag.Length,
+                            endIndex - startIndex - startTag.Length
+                        );
+
+                        // Parse JSON để lấy booking info
+                        var bookingInfo = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(jsonStr);
+                        
+                        if (bookingInfo.TryGetProperty("studio_id", out var studioIdElement) &&
+                            bookingInfo.TryGetProperty("booking_date", out var bookingDateElement) &&
+                            bookingInfo.TryGetProperty("booking_time", out var bookingTimeElement))
+                        {
+                            var studioId = studioIdElement.GetInt32();
+                            var bookingDateStr = bookingDateElement.GetString();
+                            var bookingTime = bookingTimeElement.GetString() ?? "";
+
+                            // Parse booking date
+                            if (DateTime.TryParse(bookingDateStr, out var bookingDate))
+                            {
+                                // Kiểm tra studio có tồn tại không
+                                var studio = await _context.Studios.FindAsync(studioId);
+                                if (studio != null)
+                                {
+                                    // Kiểm tra studio status - không cho phép đặt nếu UnderMaintenance
+                                    if (studio.Status == StudioStatus.UnderMaintenance)
+                                    {
+                                        request.Status = RequestStatus.Cancelled;
+                                        await _context.SaveChangesAsync();
+                                        return BadRequest(new { message = "Studio này đang bảo trì. Vui lòng chọn studio khác." });
+                                    }
+
+                                    // Kiểm tra xem studio có đang bị occupied vào ngày đặt không
+                                    var hasActiveBooking = await _context.StudioBookings
+                                        .AnyAsync(b => b.StudioId == studioId &&
+                                                      b.BookingDate.Date == bookingDate.Date &&
+                                                      b.Status == BookingStatus.Approved);
+
+                                    // Kiểm tra xem studio có status là Occupied vào ngày đặt không
+                                    // (Nếu booking date là hôm nay và studio đang Occupied)
+                                    var today = DateTimeHelper.Now.Date;
+                                    if (bookingDate.Date == today && studio.Status == StudioStatus.Occupied)
+                                    {
+                                        // Studio đã bị occupied hôm nay
+                                        request.Status = RequestStatus.Cancelled;
+                                        await _context.SaveChangesAsync();
+                                        return BadRequest(new { message = "Studio này đã được đặt vào ngày hôm nay. Vui lòng chọn ngày khác." });
+                                    }
+
+                                    if (hasActiveBooking)
+                                    {
+                                        // Đã có booking approved cho ngày này
+                                        request.Status = RequestStatus.Cancelled;
+                                        await _context.SaveChangesAsync();
+                                        return BadRequest(new { message = "Studio này đã được đặt vào ngày bạn chọn. Vui lòng chọn ngày khác." });
+                                    }
+
+                                    // Tạo StudioBooking với status Pending
+                                    var studioBooking = new StudioBooking
+                                    {
+                                        StudioId = studioId,
+                                        ServiceRequestId = request.Id,
+                                        CustomerId = request.CustomerId,
+                                        BookingDate = bookingDate.Date,
+                                        BookingTime = bookingTime,
+                                        Status = BookingStatus.Pending,
+                                        CreatedDate = DateTimeHelper.Now,
+                                        Notes = bookingInfo.TryGetProperty("notes", out var notesElement) 
+                                            ? notesElement.GetString() 
+                                            : null
+                                    };
+
+                                    _context.StudioBookings.Add(studioBooking);
+                                    
+                                    // Cập nhật ServiceRequest status thành Requested
+                                    request.Status = RequestStatus.Requested;
+                                    
+                                    await _context.SaveChangesAsync();
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log error nhưng không fail request
+                    // Có thể log vào file hoặc console
+                    Console.WriteLine($"Error creating StudioBooking: {ex.Message}");
+                }
+            }
+
             return Ok(new
             {
                 id = request.Id,
@@ -204,7 +309,7 @@ namespace MuTraProAPI.Controllers
                 title = request.Title,
                 description = request.Description,
                 file_name = request.FileName,
-                status = request.Status.ToString(), // Sẽ trả về "Pending"
+                status = request.Status.ToString(), // Sẽ trả về "Pending" hoặc "Requested" nếu là studio booking
                 created_date = request.CreatedDate,
                 due_date = request.DueDate,
                 priority = request.Priority,
