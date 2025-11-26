@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MuTraPro - Bảng Điều Khiển Khách Hàng</title>
     <link rel="stylesheet" href="styles.css" />
+    <!-- MQTT.js library for WebSocket MQTT -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   </head>
   <body>
     <div class="container">
@@ -211,11 +213,14 @@
       <!-- Studios Tab -->
       <div id="studios" class="tab-content">
         <h2>🎙️ Đặt Phòng Thu Âm</h2>
+        <p style="color: #666; margin-bottom: 20px; font-size: 14px;">
+          Chọn phòng thu âm phù hợp và đặt lịch ngay. Nhấp vào tab này để xem danh sách các phòng thu có sẵn.
+        </p>
         <div id="studiosMessage"></div>
         
         <!-- Studio List -->
         <div id="studiosList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
-          <!-- Studios will be loaded here -->
+          <p style="text-align: center; color: #999; padding: 20px; grid-column: 1 / -1;">Đang tải danh sách studio...</p>
         </div>
 
         <!-- Booking Modal -->

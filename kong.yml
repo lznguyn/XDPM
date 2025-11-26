@@ -5,18 +5,52 @@ services:
   # ================== AUTH SERVICE ==================
   - name: auth-service
     url: http://auth-service:8081
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
     routes:
       - name: auth-route
         paths:
           - /api/Auth
           - /api/Admin
           - /api/Customer
+          - /api/Experts
           - /api/Studio
           - /api/Arrangement
           - /api/Specialist
           - /api/Notification
         strip_path: false
         preserve_host: true
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - http://localhost:8080
+                - http://localhost:8082
+                - http://localhost:8000
+              methods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - PATCH
+                - OPTIONS
+              headers:
+                - Accept
+                - Accept-Version
+                - Content-Length
+                - Content-Type
+                - Authorization
+                - X-CSRF-Token
+              exposed_headers:
+                - X-Pagination-Total-Count
+                - X-Pagination-Page-Count
+              credentials: true
+              max_age: 3600
+          - name: request-termination
+            enabled: false
+          - name: response-transformer
+            enabled: false
 
   # ================== COORDINATOR SERVICE ==================
   - name: coordinator-service
@@ -27,6 +61,32 @@ services:
           - /api/coordinator
         strip_path: false
         preserve_host: true
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - http://localhost:8080
+                - http://localhost:8082
+                - http://localhost:8000
+              methods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - PATCH
+                - OPTIONS
+              headers:
+                - Accept
+                - Accept-Version
+                - Content-Length
+                - Content-Type
+                - Authorization
+                - X-CSRF-Token
+              exposed_headers:
+                - X-Pagination-Total-Count
+                - X-Pagination-Page-Count
+              credentials: true
+              max_age: 3600
 
   # ================== PAYMENT SERVICE ==================
   - name: payment-service
@@ -37,8 +97,34 @@ services:
           - /api/payments
         strip_path: false
         preserve_host: true
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - http://localhost:8080
+                - http://localhost:8082
+                - http://localhost:8000
+              methods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - PATCH
+                - OPTIONS
+              headers:
+                - Accept
+                - Accept-Version
+                - Content-Length
+                - Content-Type
+                - Authorization
+                - X-CSRF-Token
+              exposed_headers:
+                - X-Pagination-Total-Count
+                - X-Pagination-Page-Count
+              credentials: true
+              max_age: 3600
 
-  # ================== BACKEND SERVICE (TRANSCRIPTASE) ==================
+  # ================== (TRANSCRIPTASE) ==================
   - name: backend-service
     url: http://backend-service:8000
     routes:
@@ -47,11 +133,63 @@ services:
           - /api/v1
         strip_path: false
         preserve_host: true
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - http://localhost:8080
+                - http://localhost:8082
+                - http://localhost:8000
+              methods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - PATCH
+                - OPTIONS
+              headers:
+                - Accept
+                - Accept-Version
+                - Content-Length
+                - Content-Type
+                - Authorization
+                - X-CSRF-Token
+              exposed_headers:
+                - X-Pagination-Total-Count
+                - X-Pagination-Page-Count
+              credentials: true
+              max_age: 3600
       - name: backend-health-route
         paths:
           - /health
         strip_path: false
         preserve_host: true
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - http://localhost:8080
+                - http://localhost:8082
+                - http://localhost:8000
+              methods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - PATCH
+                - OPTIONS
+              headers:
+                - Accept
+                - Accept-Version
+                - Content-Length
+                - Content-Type
+                - Authorization
+                - X-CSRF-Token
+              exposed_headers:
+                - X-Pagination-Total-Count
+                - X-Pagination-Page-Count
+              credentials: true
+              max_age: 3600
 
   # ================== CUSTOMER SERVICE ==================
   - name: customer-service
@@ -68,29 +206,29 @@ services:
           - /health
         strip_path: false
         preserve_host: true
-
-# ==================== GLOBAL CORS ====================
-plugins:
-  - name: cors
-    config:
-      origins:
-        - "*"
-      methods:
-        - GET
-        - POST
-        - PUT
-        - DELETE
-        - PATCH
-        - OPTIONS
-      headers:
-        - Accept
-        - Accept-Version
-        - Content-Length
-        - Content-Type
-        - Authorization
-        - X-CSRF-Token
-      exposed_headers:
-        - X-Pagination-Total-Count
-        - X-Pagination-Page-Count
-      credentials: true
-      max_age: 3600
+        plugins:
+          - name: cors
+            config:
+              origins:
+                - http://localhost:8080
+                - http://localhost:8082
+                - http://localhost:8000
+              methods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - PATCH
+                - OPTIONS
+              headers:
+                - Accept
+                - Accept-Version
+                - Content-Length
+                - Content-Type
+                - Authorization
+                - X-CSRF-Token
+              exposed_headers:
+                - X-Pagination-Total-Count
+                - X-Pagination-Page-Count
+              credentials: true
+              max_age: 3600

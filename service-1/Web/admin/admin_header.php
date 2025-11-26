@@ -2,6 +2,9 @@
 // Cấu hình timezone UTC+7 (Vietnam Time)
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
+// Load Kong Gateway configuration
+require_once __DIR__ . '/../config.php';
+
 // Bắt đầu session và lấy thông tin user từ session JWT
 session_start();
 
@@ -133,7 +136,8 @@ document.getElementById('logoutBtn')?.addEventListener('click', async () => {
     if (token) {
         try {
             // Gọi qua Kong Gateway
-            const res = await fetch('http://localhost:8000/api/Auth/logout', {
+            const kongBaseUrl = '<?php echo getKongBaseUrl(); ?>';
+            const res = await fetch(kongBaseUrl + '/api/Auth/logout', {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Bearer ' + token

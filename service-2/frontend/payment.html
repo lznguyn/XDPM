@@ -360,9 +360,14 @@
                 const orderId = document.getElementById('orderId').value;
                 const amount = document.getElementById('amount').value;
 
-                // Gọi endpoint từ customer-service để lấy QR code
-                const response = await fetch(`${CUSTOMER_SERVICE_BASE}/payments/qr/${orderId}?amount=${amount}`);
-                if (!response.ok) throw new Error('Không thể tạo mã QR');
+                // Gọi endpoint từ customer-service để lấy QR code (qua Kong Gateway)
+                const customerServiceUrl = `${CUSTOMER_SERVICE_BASE}/api/customers/payments/qr/${orderId}?amount=${amount}`;
+                const response = await fetch(customerServiceUrl);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('QR Code API Error:', errorText);
+                    throw new Error('Không thể tạo mã QR: ' + errorText);
+                }
 
                 const qrData = await response.json();
 
@@ -372,6 +377,7 @@
                 // Hiển thị thông tin ngân hàng
                 document.getElementById('bankInfo').innerHTML = `
                     <div><strong>Số tài khoản:</strong> ${qrData.bank_account}</div>
+                    <div><strong>Chủ tài khoản:</strong> ${qrData.account_name || 'PHAN THANH AN'}</div>
                     <div><strong>Ngân hàng:</strong> ${qrData.bank_name}</div>
                     <div><strong>Nội dung:</strong> ${qrData.content}</div>
                 `;
@@ -436,8 +442,14 @@
                 });
 
                 if (!confirmResponse.ok) {
-                    throw new Error('Lỗi xác nhận thanh toán');
+                    const errorData = await confirmResponse.json().catch(() => ({}));
+                    const errorMsg = errorData.message || errorData.error || 'Lỗi xác nhận thanh toán';
+                    console.error('Confirm payment error:', errorMsg, errorData);
+                    throw new Error(errorMsg);
                 }
+
+                const confirmResult = await confirmResponse.json();
+                console.log('Payment confirmed:', confirmResult);
 
                 showMessage('✓ Thanh toán thành công!', 'success');
 

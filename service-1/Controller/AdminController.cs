@@ -4,7 +4,13 @@ using MuTraProAPI.Models;
 using MuTraProAPI.Data;
 using Microsoft.AspNetCore.Authorization;
 using static MuTraProAPI.Models.ServiceRequest;
+using static MuTraProAPI.Models.Order;
+using static MuTraProAPI.Models.MusicSubmission;
+using static MuTraProAPI.Models.User;
+using static MuTraProAPI.Models.CustomerPayment;
 using MuTraProAPI.Helpers;
+using System.Net.Http.Json;
+using System.Net.Http;
 
 namespace MuTraProAPI.Controllers
 {
@@ -13,88 +19,386 @@ namespace MuTraProAPI.Controllers
     public class AdminController : ControllerBase
     {
         private readonly MuTraProDbContext _context;
+        private readonly IConfiguration _configuration;
+        private readonly IHttpClientFactory _httpClientFactory;
 
-        public AdminController(MuTraProDbContext context)
+        public AdminController(MuTraProDbContext context, IConfiguration configuration, IHttpClientFactory httpClientFactory)
         {
             _context = context;
+            _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
+        }
+
+        // Helper method to invalidate cache
+        private async Task InvalidateAdminCache(string? pattern = null)
+        {
+            if (string.IsNullOrEmpty(pattern))
+            {
+                await RedisHelper.DeletePatternAsync("admin:*");
+            }
+            else
+            {
+                await RedisHelper.DeletePatternAsync($"admin:{pattern}");
+            }
+        }
+
+        // Helper method to invalidate request cache
+        private async Task InvalidateRequestCache(int? requestId = null)
+        {
+            if (requestId.HasValue)
+            {
+                await RedisHelper.DeleteAsync($"request:{requestId.Value}");
+            }
+            await RedisHelper.DeletePatternAsync($"request:*");
+            await RedisHelper.DeletePatternAsync("admin:service-requests*");
+        }
+
+        // Helper method to invalidate customer cache
+        private async Task InvalidateCustomerCache(int? customerId = null)
+        {
+            if (customerId.HasValue)
+            {
+                await RedisHelper.DeleteAsync($"customer:{customerId.Value}");
+            }
+            await RedisHelper.DeletePatternAsync("customer:*");
+            await RedisHelper.DeletePatternAsync("admin:customers*");
+        }
+
+        // Helper method to invalidate specialist schedule cache
+        private async Task InvalidateScheduleCache(int? specialistId = null)
+        {
+            if (specialistId.HasValue)
+            {
+                await RedisHelper.DeletePatternAsync($"schedule:specialist:{specialistId.Value}*");
+            }
+            await RedisHelper.DeletePatternAsync("schedule:*");
+            await RedisHelper.DeletePatternAsync("admin:specialists*");
         }
 
         // GET: api/Admin/stats
         [HttpGet("stats")]
         public async Task<IActionResult> GetStats()
         {
-            // Giả sử bạn đã xác thực JWT và role Admin
-            // Nếu muốn, thêm [Authorize(Roles="Admin")] để giới hạn
-            var totalPendings = await _context.Orders
-                .Where(o => o.PaymentStatus == Status.Pending)
-                .SumAsync(o => (decimal?)o.TotalPrice) ?? 0;
-
-            var totalCompleted = await _context.Orders
-                .Where(o => o.PaymentStatus == Status.Completed)
-                .SumAsync(o => (decimal?)o.TotalPrice) ?? 0;
-
-            var ordersCount = await _context.Orders.CountAsync();
-            var productsCount = await _context.Products.CountAsync();
-            var musicsubPendingCount = await _context.MusicSubmissions
-                .Where(m => m.Status == MusicStatus.Pending).CountAsync();
-            var musicsubCompletedCount = await _context.MusicSubmissions
-                .Where(m => m.Status == MusicStatus.Completed).CountAsync();
-            var expertsCount = await _context.Users
-                .Where(u => u.Role == UserRole.Arrangement ||   u.Role == UserRole.Transcription || u.Role == UserRole.Recorder)
-                .CountAsync();
-            var pendingOrdersCount = await _context.Orders
-                .Where(o => o.PaymentStatus == Status.Pending).CountAsync();
-            var completedOrdersCount = await _context.Orders
-                .Where(o => o.PaymentStatus == Status.Completed).CountAsync();
-            var usersCount = await _context.Users
-                .Where(u => u.Role == UserRole.User)
-                .CountAsync();
-            var adminsCount = await _context.Users
-                .Where(u => u.Role == UserRole.Admin)
-                .CountAsync();
-            var staffCount = await _context.Users
-                .Where(u => u.Role == UserRole.Coordinator)
-                .CountAsync();
-            var studiosCount = await _context.Studios.CountAsync();
-
-            return Ok(new
+            try
             {
-                total_pendings = totalPendings,
-                total_completed = totalCompleted,
-                orders_count = ordersCount,
-                products_count = productsCount,
-                musicsub_pending_count = musicsubPendingCount,
-                musicsub_completed_count = musicsubCompletedCount,
-                experts_count = expertsCount,
-                pending_orders_count = pendingOrdersCount,
-                completed_orders_count = completedOrdersCount,
-                users_count = usersCount,
-                admins_count = adminsCount,
-                staff_count = staffCount,
-                studios_count = studiosCount
-            });
-        }
-        // ✅ Lấy danh sách đơn hàng
-        [HttpGet("orders")]
-        public async Task<IActionResult> GetAllOrders()
-        {
-            var orders = await _context.Orders
-                .OrderByDescending(o => o.PlacedOn)
-                .Select(o => new
+                // Try to get from cache first
+                var cacheKey = "admin:stats";
+                var cached = await RedisHelper.GetAsync<object>(cacheKey);
+                if (cached != null)
                 {
-                    o.Id,
-                    o.UserId,
-                    o.Name,
-                    o.Number,
-                    o.Email,
-                    o.Method,
-                    o.TotalProducts,
-                    o.TotalPrice,
-                    PaymentStatus = o.PaymentStatus.ToString()
-                })
-                .ToListAsync();
+                    return Ok(cached);
+                }
 
-            return Ok(orders);
+                // Giả sử bạn đã xác thực JWT và role Admin
+                // Nếu muốn, thêm [Authorize(Roles="Admin")] để giới hạn
+                var totalPendings = await _context.Orders
+                    .Where(o => o.PaymentStatus == Status.Pending)
+                    .SumAsync(o => (decimal?)o.TotalPrice) ?? 0;
+
+                var totalCompleted = await _context.Orders
+                    .Where(o => o.PaymentStatus == Status.Completed)
+                    .SumAsync(o => (decimal?)o.TotalPrice) ?? 0;
+
+                var ordersCount = await _context.Orders.CountAsync();
+                var productsCount = await _context.Products.CountAsync();
+                var musicsubPendingCount = await _context.MusicSubmissions
+                    .Where(m => m.Status == MusicStatus.Pending).CountAsync();
+                var musicsubCompletedCount = await _context.MusicSubmissions
+                    .Where(m => m.Status == MusicStatus.Completed).CountAsync();
+                var expertsCount = await _context.Users
+                    .Where(u => u.Role == UserRole.Arrangement ||   u.Role == UserRole.Transcription || u.Role == UserRole.Recorder)
+                    .CountAsync();
+                var pendingOrdersCount = await _context.Orders
+                    .Where(o => o.PaymentStatus == Status.Pending).CountAsync();
+                var completedOrdersCount = await _context.Orders
+                    .Where(o => o.PaymentStatus == Status.Completed).CountAsync();
+                var usersCount = await _context.Users
+                    .Where(u => u.Role == UserRole.User)
+                    .CountAsync();
+                var adminsCount = await _context.Users
+                    .Where(u => u.Role == UserRole.Admin)
+                    .CountAsync();
+                var staffCount = await _context.Users
+                    .Where(u => u.Role == UserRole.Coordinator)
+                    .CountAsync();
+                var studiosCount = await _context.Studios.CountAsync();
+
+                var result = new
+                {
+                    total_pendings = totalPendings,
+                    total_completed = totalCompleted,
+                    orders_count = ordersCount,
+                    products_count = productsCount,
+                    musicsub_pending_count = musicsubPendingCount,
+                    musicsub_completed_count = musicsubCompletedCount,
+                    experts_count = expertsCount,
+                    pending_orders_count = pendingOrdersCount,
+                    completed_orders_count = completedOrdersCount,
+                    users_count = usersCount,
+                    admins_count = adminsCount,
+                    staff_count = staffCount,
+                    studios_count = studiosCount
+                };
+
+                // Store in cache with 5 minutes TTL (stats change frequently)
+                await RedisHelper.SetAsync(cacheKey, result, TimeSpan.FromMinutes(5));
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Lỗi khi lấy thống kê",
+                    error = ex.Message,
+                    stackTrace = ex.StackTrace
+                });
+            }
+        }
+        // ✅ Lấy danh sách đơn hàng từ service-3 (payment-service) và merge với service-1
+        [HttpGet("orders")]
+        public async Task<IActionResult> GetAllOrders([FromQuery] bool? refresh = false)
+        {
+            try
+            {
+                var cacheKey = "admin:orders";
+                
+                // Nếu có refresh=true, bypass cache và lấy dữ liệu mới từ database
+                if (refresh != true)
+                {
+                    // Try to get from cache first
+                    try
+                    {
+                        var cached = await RedisHelper.GetAsync<List<object>>(cacheKey);
+                        if (cached != null)
+                        {
+                            return Ok(cached);
+                        }
+                    }
+                    catch (Exception cacheEx)
+                    {
+                        // Log cache error nhưng tiếp tục lấy từ database
+                        Console.WriteLine($"Cache error (continuing with DB): {cacheEx.Message}");
+                    }
+                }
+
+                // Lấy orders từ service-1 (database local)
+                List<dynamic> localOrders = new List<dynamic>();
+                try
+                {
+                    var orders = await _context.Orders
+                        .OrderByDescending(o => o.PlacedOn)
+                        .Select(o => new
+                        {
+                            o.Id,
+                            o.UserId,
+                            o.Name,
+                            o.Number,
+                            o.Email,
+                            o.Method,
+                            o.TotalProducts,
+                            o.TotalPrice,
+                            o.PlacedOn,
+                            PaymentStatus = o.PaymentStatus.ToString(),
+                            Source = "service-1"
+                        })
+                        .ToListAsync();
+                    localOrders = orders.Cast<dynamic>().ToList();
+                }
+                catch (Exception localOrderEx)
+                {
+                    // Nếu bảng Orders không tồn tại hoặc có lỗi, chỉ log warning và tiếp tục với payments từ service-3
+                    Console.WriteLine($"Warning: Failed to fetch local orders (table may not exist): {localOrderEx.Message}");
+                    Console.WriteLine("Continuing with payments from service-3 only.");
+                }
+
+                // Lấy payments từ service-3 (payment-service)
+                List<dynamic> payments = new List<dynamic>();
+                try
+                {
+                    var paymentServiceUrl = _configuration["PaymentService:BaseUrl"] ?? "http://kong:8000/api/payments";
+                    var httpClient = _httpClientFactory.CreateClient();
+                    httpClient.Timeout = TimeSpan.FromSeconds(10);
+                    
+                    Console.WriteLine($"Fetching payments from: {paymentServiceUrl}");
+                    var paymentResponse = await httpClient.GetAsync(paymentServiceUrl);
+                    Console.WriteLine($"Payment service response status: {paymentResponse.StatusCode}");
+                    
+                    if (paymentResponse.IsSuccessStatusCode)
+                    {
+                        var jsonString = await paymentResponse.Content.ReadAsStringAsync();
+                        var jsonLength = jsonString != null ? jsonString.Length : 0;
+                        Console.WriteLine($"Payment service response length: {jsonLength}");
+                        if (jsonString != null && jsonString.Length > 0)
+                        {
+                            var previewLength = Math.Min(200, jsonString.Length);
+                            Console.WriteLine($"Payment service response preview: {jsonString.Substring(0, previewLength)}");
+                        }
+                        
+                        var paymentData = jsonString != null ? 
+                            System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(jsonString) : null;
+                        
+                        if (paymentData != null)
+                        {
+                            Console.WriteLine($"Parsed {paymentData.Count} payments from service-3");
+                            foreach (var payment in paymentData)
+                            {
+                                try
+                                {
+                                    var id = payment.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                                    var customerId = payment.TryGetProperty("customerId", out var cidProp) ? cidProp.GetString() : null;
+                                    var orderId = payment.TryGetProperty("orderId", out var oidProp) ? oidProp.GetString() : null;
+                                    
+                                    // Parse amount - có thể là string hoặc number
+                                    decimal amount = 0;
+                                    if (payment.TryGetProperty("amount", out var amtProp))
+                                    {
+                                        if (amtProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                                        {
+                                            var amountStr = amtProp.GetString();
+                                            if (!string.IsNullOrEmpty(amountStr) && decimal.TryParse(amountStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsedAmount))
+                                            {
+                                                amount = parsedAmount;
+                                            }
+                                        }
+                                        else if (amtProp.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                        {
+                                            amount = amtProp.GetDecimal();
+                                        }
+                                    }
+                                    
+                                    var method = payment.TryGetProperty("method", out var methodProp) ? methodProp.GetString() : "N/A";
+                                    var status = payment.TryGetProperty("status", out var statusProp) ? statusProp.GetString() : "PENDING";
+                                    DateTime createdAt;
+                                    if (payment.TryGetProperty("createdAt", out var createdProp))
+                                    {
+                                        var createdAtStr = createdProp.GetString();
+                                        createdAt = !string.IsNullOrEmpty(createdAtStr) ? DateTime.Parse(createdAtStr) : DateTime.Now;
+                                    }
+                                    else
+                                    {
+                                        createdAt = DateTime.Now;
+                                    }
+                                    
+                                    // Log để debug
+                                    Console.WriteLine($"Payment {id}: amount={amount}, status={status}");
+                                    
+                                    payments.Add(new
+                                    {
+                                        Id = id ?? Guid.NewGuid().ToString(),
+                                        UserId = customerId ?? "0",
+                                        Name = $"Customer {customerId ?? "N/A"}",
+                                        Number = orderId ?? "N/A",
+                                        Email = $"customer{customerId ?? "0"}@example.com",
+                                        Method = method,
+                                        TotalProducts = "1",
+                                        TotalPrice = (int)Math.Round(amount), // Round thay vì cast trực tiếp
+                                        PlacedOn = createdAt,
+                                        PaymentStatus = status,
+                                        Source = "service-3"
+                                    });
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"Error parsing payment: {ex.Message}");
+                                    Console.WriteLine($"Payment JSON: {payment.ToString()}");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Warning: Payment data is null after deserialization");
+                        }
+                    }
+                    else
+                    {
+                        var errorContent = await paymentResponse.Content.ReadAsStringAsync();
+                        Console.WriteLine($"Warning: Payment service returned {paymentResponse.StatusCode}. Error: {errorContent}");
+                    }
+                }
+                catch (Exception paymentEx)
+                {
+                    Console.WriteLine($"Warning: Failed to fetch payments from service-3: {paymentEx.Message}");
+                    Console.WriteLine($"Stack trace: {paymentEx.StackTrace}");
+                    if (paymentEx.InnerException != null)
+                    {
+                        Console.WriteLine($"Inner exception: {paymentEx.InnerException.Message}");
+                    }
+                }
+                
+                Console.WriteLine($"Total payments fetched from service-3: {payments.Count}");
+
+                // Merge orders từ service-1 và payments từ service-3
+                var allOrders = new List<object>();
+                if (localOrders != null && localOrders.Count > 0)
+                {
+                    allOrders.AddRange(localOrders.Cast<object>());
+                    Console.WriteLine($"Added {localOrders.Count} local orders");
+                }
+                if (payments != null && payments.Count > 0)
+                {
+                    allOrders.AddRange(payments.Cast<object>());
+                    Console.WriteLine($"Added {payments.Count} payments from service-3");
+                }
+                
+                Console.WriteLine($"Total orders to return: {allOrders.Count}");
+                
+                // Sort by date descending
+                allOrders = allOrders.OrderByDescending(o => {
+                    try
+                    {
+                        var json = System.Text.Json.JsonSerializer.Serialize(o);
+                        var element = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(json);
+                        
+                        if (element.TryGetProperty("PlacedOn", out var placedOn))
+                        {
+                            if (placedOn.ValueKind == System.Text.Json.JsonValueKind.String)
+                            {
+                                return DateTime.Parse(placedOn.GetString() ?? DateTime.MinValue.ToString());
+                            }
+                        }
+                        if (element.TryGetProperty("placedOn", out var placedOn2))
+                        {
+                            if (placedOn2.ValueKind == System.Text.Json.JsonValueKind.String)
+                            {
+                                return DateTime.Parse(placedOn2.GetString() ?? DateTime.MinValue.ToString());
+                            }
+                        }
+                    }
+                    catch { }
+                    return DateTime.MinValue;
+                }).ToList();
+
+                // Store in cache with 2 minutes TTL
+                try
+                {
+                    await RedisHelper.SetAsync(cacheKey, allOrders, TimeSpan.FromMinutes(2));
+                }
+                catch (Exception cacheEx)
+                {
+                    Console.WriteLine($"Cache set error (returning data anyway): {cacheEx.Message}");
+                }
+
+                return Ok(allOrders);
+            }
+            catch (Exception ex)
+            {
+                // Log chi tiết lỗi
+                Console.WriteLine($"Error in GetAllOrders: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+
+                return StatusCode(500, new
+                {
+                    message = "Lỗi khi lấy danh sách đơn hàng",
+                    error = ex.Message,
+                    stackTrace = ex.StackTrace,
+                    innerException = ex.InnerException?.Message
+                });
+            }
         }
         [HttpGet("orders/{id}")]
         public async Task<IActionResult> GetOrderById(int id)
@@ -129,6 +433,10 @@ namespace MuTraProAPI.Controllers
             {
                 order.PaymentStatus = status;
                 await _context.SaveChangesAsync();
+                
+                // Invalidate cache để đảm bảo dữ liệu mới được hiển thị
+                await InvalidateAdminCache("orders");
+                
                 return Ok(new { message = "Payment status updated successfully." });
             }
 
@@ -148,6 +456,9 @@ namespace MuTraProAPI.Controllers
 
             _context.Orders.Remove(order);
             await _context.SaveChangesAsync();
+            
+            // Invalidate cache để đảm bảo dữ liệu mới được hiển thị
+            await InvalidateAdminCache("orders");
 
             return Ok(new { message = "Order deleted successfully." });
         }
@@ -159,6 +470,14 @@ namespace MuTraProAPI.Controllers
         [HttpGet("customers")]
         public async Task<IActionResult> GetAllCustomers()
         {
+            // Try to get from cache first
+            var cacheKey = "admin:customers";
+            var cached = await RedisHelper.GetAsync<List<object>>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var customers = await _context.Customers
                 .Include(c => c.User)
                 .OrderByDescending(c => c.AccountCreated)
@@ -177,12 +496,23 @@ namespace MuTraProAPI.Controllers
                 })
                 .ToListAsync();
 
+            // Store in cache with 15 minutes TTL
+            await RedisHelper.SetAsync(cacheKey, customers, TimeSpan.FromMinutes(15));
+
             return Ok(customers);
         }
 
         [HttpGet("customers/{id}")]
         public async Task<IActionResult> GetCustomerById(int id)
         {
+            // Try to get from cache first
+            var cacheKey = $"customer:{id}";
+            var cached = await RedisHelper.GetAsync<object>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var customer = await _context.Customers
                 .Include(c => c.User)
                 .FirstOrDefaultAsync(c => c.Id == id);
@@ -190,7 +520,7 @@ namespace MuTraProAPI.Controllers
             if (customer == null)
                 return NotFound(new { message = "Customer not found" });
 
-            return Ok(new
+            var result = new
             {
                 customer.Id,
                 customer.Name,
@@ -202,7 +532,12 @@ namespace MuTraProAPI.Controllers
                 UserId = customer.UserId,
                 UserName = customer.User != null ? customer.User.Name : null,
                 UserRole = customer.User != null ? customer.User.Role.ToString() : null
-            });
+            };
+
+            // Store in cache with 1 hour TTL
+            await RedisHelper.SetAsync(cacheKey, result, TimeSpan.FromHours(1));
+
+            return Ok(result);
         }
 
         // =====================================================
@@ -212,42 +547,118 @@ namespace MuTraProAPI.Controllers
         [HttpGet("service-requests")]
         public async Task<IActionResult> GetAllServiceRequests()
         {
-            var requests = await _context.ServiceRequests
-                .Include(r => r.Customer)
-                .Include(r => r.AssignedSpecialist)
-                .Include(r => r.PreferredSpecialist)
-                .OrderByDescending(r => r.CreatedDate)
-                .Select(r => new
+            try
+            {
+                // Try to get from cache first
+                var cacheKey = "admin:service-requests";
+                var cached = await RedisHelper.GetAsync<List<object>>(cacheKey);
+                if (cached != null)
                 {
-                    r.Id,
-                    r.CustomerId,
-                    CustomerName = r.Customer != null ? r.Customer.Name : null,
-                    CustomerEmail = r.Customer != null ? r.Customer.Email : null,
-                    r.ServiceType,
-                    r.Title,
-                    r.Description,
-                    r.FileName,
-                    r.Status,
-                    r.CreatedDate,
-                    r.DueDate,
-                    r.AssignedSpecialistId,
-                    AssignedSpecialistName = r.AssignedSpecialist != null ? r.AssignedSpecialist.Name : null,
-                    r.PreferredSpecialistId,
-                    PreferredSpecialistName = r.PreferredSpecialist != null ? r.PreferredSpecialist.Name : null,
-                    r.ScheduledDate,
-                    r.ScheduledTimeSlot,
-                    r.MeetingNotes,
-                    r.Priority,
-                    r.Paid
-                })
-                .ToListAsync();
+                    Console.WriteLine($"[CACHE HIT] Returning cached service requests (count: {cached.Count})");
+                    return Ok(cached);
+                }
 
-            return Ok(requests);
+                Console.WriteLine("[DB QUERY] Fetching service requests from database...");
+                var startTime = DateTime.UtcNow;
+
+                // Query với left join để tránh lỗi khi Customer không tồn tại
+                // Sử dụng AsNoTracking() để giảm overhead và tăng performance
+                var requests = await _context.ServiceRequests
+                    .AsNoTracking() // Tối ưu: không track changes, giảm memory usage
+                    .Include(r => r.Customer)
+                    .Include(r => r.AssignedSpecialist)
+                    .Include(r => r.PreferredSpecialist)
+                    .OrderByDescending(r => r.CreatedDate) // Index idx_created_date sẽ được sử dụng
+                    .Select(r => new
+                    {
+                        r.Id,
+                        r.CustomerId,
+                        CustomerName = r.Customer != null ? r.Customer.Name : "N/A",
+                        CustomerEmail = r.Customer != null ? r.Customer.Email : "N/A",
+                        ServiceType = r.ServiceType.ToString(),
+                        r.Title,
+                        r.Description,
+                        r.FileName,
+                        // Trả về status dưới dạng string với format đúng (PascalCase)
+                        Status = r.Status.ToString(),
+                        r.CreatedDate,
+                        r.DueDate,
+                        r.AssignedSpecialistId,
+                        AssignedSpecialistName = r.AssignedSpecialist != null ? r.AssignedSpecialist.Name : null,
+                        r.PreferredSpecialistId,
+                        PreferredSpecialistName = r.PreferredSpecialist != null ? r.PreferredSpecialist.Name : null,
+                        r.ScheduledDate,
+                        r.ScheduledTimeSlot,
+                        r.MeetingNotes,
+                        r.Priority,
+                        r.Paid
+                    })
+                    .ToListAsync();
+
+                var queryTime = (DateTime.UtcNow - startTime).TotalMilliseconds;
+                Console.WriteLine($"[DB QUERY] Fetched {requests.Count} service requests in {queryTime:F2}ms");
+
+                // Store in cache with 2 minutes TTL (giảm từ 10 phút để cập nhật nhanh hơn)
+                try
+                {
+                    await RedisHelper.SetAsync(cacheKey, requests, TimeSpan.FromMinutes(2));
+                    Console.WriteLine("[CACHE] Stored service requests in cache");
+                }
+                catch (Exception cacheEx)
+                {
+                    Console.WriteLine($"[CACHE WARNING] Failed to cache results: {cacheEx.Message}");
+                    // Continue without cache - không fail request
+                }
+
+                return Ok(requests);
+            }
+            catch (Microsoft.EntityFrameworkCore.DbUpdateException dbEx)
+            {
+                // Database specific errors
+                Console.WriteLine($"Database error getting service requests: {dbEx.Message}");
+                Console.WriteLine($"Inner exception: {dbEx.InnerException?.Message}");
+                return StatusCode(500, new { message = "Database error occurred", error = dbEx.Message });
+            }
+            catch (Exception ex)
+            {
+                // Log error and return empty array instead of crashing
+                Console.WriteLine($"Error getting service requests: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                }
+                
+                // Đảm bảo luôn trả về JSON hợp lệ (empty array)
+                // Điều này giúp tránh lỗi "invalid response from upstream server"
+                try
+                {
+                    return Ok(new List<object>()); // Return empty list instead of error
+                }
+                catch
+                {
+                    // Fallback: trả về empty JSON array string nếu có lỗi serialize
+                    return new ContentResult
+                    {
+                        Content = "[]",
+                        ContentType = "application/json",
+                        StatusCode = 200
+                    };
+                }
+            }
         }
 
         [HttpGet("service-requests/{id}")]
         public async Task<IActionResult> GetServiceRequestById(int id)
         {
+            // Try to get from cache first
+            var cacheKey = $"request:{id}";
+            var cached = await RedisHelper.GetAsync<object>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var request = await _context.ServiceRequests
                 .Include(r => r.Customer)
                 .Include(r => r.AssignedSpecialist)
@@ -256,7 +667,7 @@ namespace MuTraProAPI.Controllers
             if (request == null)
                 return NotFound(new { message = "Service request not found" });
 
-            return Ok(new
+            var result = new
             {
                 request.Id,
                 request.CustomerId,
@@ -273,7 +684,12 @@ namespace MuTraProAPI.Controllers
                 AssignedSpecialistName = request.AssignedSpecialist != null ? request.AssignedSpecialist.Name : null,
                 request.Priority,
                 request.Paid
-            });
+            };
+
+            // Store in cache with 30 minutes TTL
+            await RedisHelper.SetAsync(cacheKey, result, TimeSpan.FromMinutes(30));
+
+            return Ok(result);
         }
 
         [HttpPatch("service-requests/{id}/status")]
@@ -290,6 +706,9 @@ namespace MuTraProAPI.Controllers
                 var oldStatus = request.Status;
                 request.Status = status;
                 await _context.SaveChangesAsync();
+                
+                // Invalidate cache
+                await InvalidateRequestCache(requestId: id);
                 
                 // Tạo thông báo cho khách hàng nếu trạng thái thay đổi
                 if (oldStatus != status)
@@ -324,6 +743,9 @@ namespace MuTraProAPI.Controllers
             request.Status = RequestStatus.Assigned;
             await _context.SaveChangesAsync();
 
+            // Invalidate cache
+            await InvalidateRequestCache(requestId: id);
+
             // Tạo thông báo cho khách hàng
             await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status);
 
@@ -347,6 +769,9 @@ namespace MuTraProAPI.Controllers
             var oldStatus = request.Status;
             request.Status = RequestStatus.PendingReview;
             await _context.SaveChangesAsync();
+
+            // Invalidate cache
+            await InvalidateRequestCache(requestId: id);
 
             // Tạo thông báo cho khách hàng
             await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status);
@@ -378,6 +803,9 @@ namespace MuTraProAPI.Controllers
                 request.MeetingNotes = $"Lý do từ chối: {dto.Reason}";
             }
             await _context.SaveChangesAsync();
+
+            // Invalidate cache
+            await InvalidateRequestCache(requestId: id);
 
             // Tạo thông báo cho khách hàng
             await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status, dto?.Reason);
@@ -437,6 +865,10 @@ namespace MuTraProAPI.Controllers
             request.Status = RequestStatus.PendingMeetingConfirmation;
             await _context.SaveChangesAsync();
 
+            // Invalidate cache
+            await InvalidateRequestCache(requestId: id);
+            await InvalidateScheduleCache(specialistId: dto.SpecialistId);
+
             // Tạo thông báo cho khách hàng
             await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status);
 
@@ -477,6 +909,14 @@ namespace MuTraProAPI.Controllers
         [HttpGet("specialists/{id}/schedule")]
         public async Task<IActionResult> GetSpecialistSchedule(int id, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
         {
+            // Try to get from cache first
+            var cacheKey = $"schedule:specialist:{id}:{startDate?.ToString("yyyy-MM-dd") ?? "all"}:{endDate?.ToString("yyyy-MM-dd") ?? "all"}";
+            var cached = await RedisHelper.GetAsync<List<object>>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var specialist = await _context.Users.FindAsync(id);
             if (specialist == null)
                 return NotFound(new { message = "Specialist not found" });
@@ -490,7 +930,7 @@ namespace MuTraProAPI.Controllers
 
             var schedules = await query.OrderBy(s => s.Date).ToListAsync();
 
-            return Ok(schedules.Select(s => new
+            var result = schedules.Select(s => new
             {
                 s.Id,
                 s.SpecialistId,
@@ -504,7 +944,12 @@ namespace MuTraProAPI.Controllers
                 },
                 s.CreatedAt,
                 s.UpdatedAt
-            }));
+            }).ToList();
+
+            // Store in cache with 30 minutes TTL
+            await RedisHelper.SetAsync(cacheKey, result, TimeSpan.FromMinutes(30));
+
+            return Ok(result);
         }
 
         // =====================================================

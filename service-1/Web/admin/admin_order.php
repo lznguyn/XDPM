@@ -12,15 +12,24 @@ if (!$admin_id) {
 }
 
 // API base URL - Gọi qua Kong Gateway
-$apiBase = "http://localhost:8000/api/payments";
+require_once __DIR__ . '/../config.php';
+$kongBase = getKongBaseUrl();
+$apiBase = "$kongBase/api/Admin/orders"; // Gọi Admin API để lấy cả orders từ service-1 và payments từ service-3
+$paymentApiBase = "$kongBase/api/payments"; // Payment service từ service-3 (cho confirm payment)
 
-// ✅ Hàm gọi API
-function callApi($url, $method = 'GET', $data = null)
-{
+// Hàm gọi API
+function callApi($url, $method = 'GET', $data = null, $token = '') {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+    
+    $headers = ['Content-Type: application/json', 'Accept: application/json'];
+    if ($token) {
+        $headers[] = 'Authorization: Bearer ' . $token;
+    }
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     if ($data) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
@@ -28,32 +37,118 @@ function callApi($url, $method = 'GET', $data = null)
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
 
-    return [
+    $result = [
         'code' => $httpCode,
-        'body' => json_decode($response, true)
+        'body' => null,
+        'error' => $curlError
     ];
+
+    if ($curlError) {
+        error_log("CURL Error in admin_order.php: $curlError for URL: $url");
+    }
+
+    if ($response !== false) {
+        $decoded = json_decode($response, true);
+        $result['body'] = ($decoded !== null) ? $decoded : $response;
+    }
+
+    if ($httpCode >= 400) {
+        error_log("API Error in admin_order.php: HTTP $httpCode for URL: $url, Response: " . ($response ?: 'No response'));
+    }
+
+    return $result;
 }
 
 // ✅ Xử lý xác nhận thanh toán
 if (isset($_GET['confirm'])) {
     $paymentId = $_GET['confirm'];
-    $res = callApi("$apiBase/$paymentId/confirm", "POST", ["result" => "SUCCESS"]);
+    // Gọi trực tiếp payment-service để confirm
+    $res = callApi("$paymentApiBase/$paymentId/confirm", "POST", ["result" => "SUCCESS"], '');
 
     if ($res['code'] == 200 || $res['code'] == 201) {
         $_SESSION['toast_message'] = "✅ Thanh toán #$paymentId đã được xác nhận!";
     } else {
-        $_SESSION['toast_message'] = "❌ Lỗi xác nhận thanh toán!";
+        $errorMsg = $res['body']['message'] ?? ($res['body']['error'] ?? 'Unknown error');
+        $_SESSION['toast_message'] = "❌ Lỗi xác nhận thanh toán: " . htmlspecialchars($errorMsg);
     }
 
-    header('location:admin_order.php');
+    // Redirect với refresh và debug
+    header('location:admin_order.php?refresh=true&debug=1');
     exit();
 }
 
-// ✅ Lấy danh sách thanh toán từ API
-$res = callApi("$apiBase");
-$payments = $res['body'] ?? [];
+// ✅ Lấy danh sách orders (merge từ service-1 và service-3) từ Admin API
+$refresh = isset($_GET['refresh']) ? '?refresh=true' : '';
+$res = callApi("$apiBase$refresh", "GET", null, '');
+$payments = [];
+$apiError = null;
+
+// Debug mode - tự động bật khi có refresh=true
+$debug = (isset($_GET['refresh']) || isset($_GET['debug'])) ? true : false;
+
+if ($debug) {
+    error_log("API Response Code: " . ($res['code'] ?? 'N/A'));
+    error_log("API Response Body: " . json_encode($res['body'] ?? 'No body'));
+    error_log("API Error: " . ($res['error'] ?? 'No error'));
+}
+
+if ($res['code'] == 200 && isset($res['body'])) {
+    // Xử lý response - có thể là array hoặc string
+    if (is_array($res['body'])) {
+        $payments = $res['body'];
+        if ($debug) {
+            error_log("Payments count (array): " . count($payments));
+        }
+    } else if (is_string($res['body'])) {
+        // Nếu là string, thử decode JSON
+        $decoded = json_decode($res['body'], true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $payments = $decoded;
+            if ($debug) {
+                error_log("Decoded payments count: " . count($payments));
+            }
+        } else {
+            // Nếu không phải JSON, thử parse lại
+            $decoded = json_decode($res['body'], true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $payments = $decoded;
+            } else {
+                if ($debug) {
+                    error_log("JSON decode error: " . json_last_error_msg());
+                    error_log("Response body type: " . gettype($res['body']));
+                    error_log("Response body length: " . strlen($res['body']));
+                    error_log("Response body preview: " . substr($res['body'], 0, 200));
+                }
+            }
+        }
+    } else {
+        // Nếu không phải array hay string, log để debug
+        if ($debug) {
+            error_log("Unexpected response body type: " . gettype($res['body']));
+        }
+    }
+    
+    // Đảm bảo $payments là array
+    if (!is_array($payments)) {
+        $payments = [];
+        if ($debug) {
+            error_log("Warning: payments is not an array, resetting to empty array");
+        }
+    }
+} else {
+    $apiError = "API Error: HTTP " . ($res['code'] ?? 'N/A');
+    if (isset($res['body']['message'])) {
+        $apiError .= " - " . $res['body']['message'];
+    } elseif (isset($res['error'])) {
+        $apiError .= " - cURL Error: " . $res['error'];
+    }
+    if ($debug) {
+        error_log("API Error: " . $apiError);
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -89,17 +184,81 @@ $payments = $res['body'] ?? [];
                     <p class="text-gray-600 mt-1">Xem và xác nhận các giao dịch thanh toán</p>
                 </div>
             </div>
+            <div class="flex gap-2">
+                <a href="?refresh=true&debug=1" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                    <i class="fas fa-sync-alt mr-2"></i>Làm mới
+                </a>
+            </div>
         </div>
     </div>
+
+    <!-- Error message nếu có -->
+    <?php if ($apiError): ?>
+    <div class="max-w-7xl mx-auto px-4 py-4">
+        <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            <div class="flex items-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                <div>
+                    <strong>Lỗi khi tải thanh toán:</strong> <?= htmlspecialchars($apiError) ?>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
 
     <!-- Stats Cards -->
     <div class="max-w-7xl mx-auto px-4 py-6">
         <?php
         $totalPayments = count($payments);
-        $paidCount = count(array_filter($payments, function($p) { return isset($p['status']) && strtoupper($p['status']) === 'PAID'; }));
-        $pendingCount = count(array_filter($payments, function($p) { return isset($p['status']) && strtoupper($p['status']) === 'PENDING'; }));
-        $failedCount = count(array_filter($payments, function($p) { return isset($p['status']) && strtoupper($p['status']) === 'FAILED'; }));
-        $totalAmount = array_sum(array_column($payments, 'amount'));
+        // Xử lý status từ cả service-1 (PaymentStatus) và service-3 (status)
+        // Hỗ trợ cả PascalCase và camelCase
+        $paidCount = count(array_filter($payments, function($p) { 
+            $status = isset($p['status']) ? strtoupper($p['status']) : 
+                     (isset($p['Status']) ? strtoupper($p['Status']) : 
+                     (isset($p['PaymentStatus']) ? strtoupper($p['PaymentStatus']) : 
+                     (isset($p['paymentStatus']) ? strtoupper($p['paymentStatus']) : '')));
+            return $status === 'PAID' || $status === 'COMPLETED';
+        }));
+        $pendingCount = count(array_filter($payments, function($p) { 
+            $status = isset($p['status']) ? strtoupper($p['status']) : 
+                     (isset($p['Status']) ? strtoupper($p['Status']) : 
+                     (isset($p['PaymentStatus']) ? strtoupper($p['PaymentStatus']) : 
+                     (isset($p['paymentStatus']) ? strtoupper($p['paymentStatus']) : '')));
+            return $status === 'PENDING';
+        }));
+        $failedCount = count(array_filter($payments, function($p) { 
+            $status = isset($p['status']) ? strtoupper($p['status']) : 
+                     (isset($p['Status']) ? strtoupper($p['Status']) : 
+                     (isset($p['PaymentStatus']) ? strtoupper($p['PaymentStatus']) : 
+                     (isset($p['paymentStatus']) ? strtoupper($p['paymentStatus']) : '')));
+            return $status === 'FAILED';
+        }));
+        // Tính tổng tiền từ cả amount và TotalPrice
+        // Hỗ trợ cả PascalCase và camelCase, và xử lý cả string và number
+        $totalAmount = array_sum(array_map(function($p) {
+            // Thử lấy từ amount (camelCase)
+            if (isset($p['amount'])) {
+                $amt = is_string($p['amount']) ? floatval($p['amount']) : floatval($p['amount']);
+                if ($amt > 0) return $amt;
+            }
+            // Thử lấy từ Amount (PascalCase)
+            if (isset($p['Amount'])) {
+                $amt = is_string($p['Amount']) ? floatval($p['Amount']) : floatval($p['Amount']);
+                if ($amt > 0) return $amt;
+            }
+            // Thử lấy từ TotalPrice (PascalCase)
+            if (isset($p['TotalPrice'])) {
+                $amt = is_string($p['TotalPrice']) ? floatval($p['TotalPrice']) : floatval($p['TotalPrice']);
+                if ($amt > 0) return $amt;
+            }
+            // Thử lấy từ totalPrice (camelCase)
+            if (isset($p['totalPrice'])) {
+                $amt = is_string($p['totalPrice']) ? floatval($p['totalPrice']) : floatval($p['totalPrice']);
+                if ($amt > 0) return $amt;
+            }
+            return 0;
+        }, $payments));
         ?>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div class="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
@@ -147,14 +306,60 @@ $payments = $res['body'] ?? [];
                                 </td>
                             </tr>
                         <?php else: ?>
-                            <?php foreach ($payments as $payment): 
-                                $status = isset($payment['status']) ? strtoupper($payment['status']) : 'UNKNOWN';
+                            <?php foreach ($payments as $payment):
+                                // Xử lý cả orders từ service-1 và payments từ service-3
+                                // Kiểm tra xem đây là order từ service-1 hay payment từ service-3
+                                // Hỗ trợ cả PascalCase và camelCase
+                                $isPayment = (isset($payment['Source']) && $payment['Source'] === 'service-3') || 
+                                            (isset($payment['source']) && $payment['source'] === 'service-3');
+                                
+                                // Lấy paymentId - hỗ trợ cả Id và id
+                                $paymentId = isset($payment['Id']) ? $payment['Id'] : (isset($payment['id']) ? $payment['id'] : '');
+                                
+                                // Lấy orderId - hỗ trợ cả Number, orderId, và number
+                                $orderId = isset($payment['Number']) ? $payment['Number'] : 
+                                          (isset($payment['orderId']) ? $payment['orderId'] : 
+                                          (isset($payment['number']) ? $payment['number'] : ''));
+                                
+                                // Lấy customerId - hỗ trợ cả UserId, customerId, và userId
+                                $customerId = isset($payment['UserId']) ? $payment['UserId'] : 
+                                             (isset($payment['customerId']) ? $payment['customerId'] : 
+                                             (isset($payment['userId']) ? $payment['userId'] : ''));
+                                
+                                // Lấy amount - hỗ trợ cả TotalPrice, amount, và totalPrice
+                                // Xử lý cả string và number, đảm bảo không bị nhân 100
+                                $amount = 0;
+                                if (isset($payment['TotalPrice'])) {
+                                    $amount = is_string($payment['TotalPrice']) ? floatval($payment['TotalPrice']) : floatval($payment['TotalPrice']);
+                                } elseif (isset($payment['amount'])) {
+                                    $amount = is_string($payment['amount']) ? floatval($payment['amount']) : floatval($payment['amount']);
+                                } elseif (isset($payment['Amount'])) {
+                                    $amount = is_string($payment['Amount']) ? floatval($payment['Amount']) : floatval($payment['Amount']);
+                                } elseif (isset($payment['totalPrice'])) {
+                                    $amount = is_string($payment['totalPrice']) ? floatval($payment['totalPrice']) : floatval($payment['totalPrice']);
+                                }
+                                
+                                // Lấy method - hỗ trợ cả Method và method
+                                $method = isset($payment['Method']) ? $payment['Method'] : 
+                                         (isset($payment['method']) ? $payment['method'] : 'UNKNOWN');
+                                
+                                // Lấy status - hỗ trợ cả PaymentStatus, status, và paymentStatus
+                                $status = isset($payment['PaymentStatus']) ? strtoupper($payment['PaymentStatus']) : 
+                                         (isset($payment['status']) ? strtoupper($payment['status']) : 
+                                         (isset($payment['paymentStatus']) ? strtoupper($payment['paymentStatus']) : 'UNKNOWN'));
+                                
+                                // Lấy createdAt - hỗ trợ cả PlacedOn, createdAt, và placedOn
+                                $createdAt = isset($payment['PlacedOn']) ? $payment['PlacedOn'] : 
+                                           (isset($payment['createdAt']) ? $payment['createdAt'] : 
+                                           (isset($payment['placedOn']) ? $payment['placedOn'] : null)); 
+                                // Status handling
                                 $statusClass = '';
                                 $statusText = '';
                                 $statusIcon = '';
                                 
                                 switch ($status) {
                                     case 'PAID':
+                                    case 'COMPLETED':
                                         $statusClass = 'bg-green-100 text-green-800';
                                         $statusText = 'Đã Thanh Toán';
                                         $statusIcon = 'fa-check-circle';
@@ -175,7 +380,7 @@ $payments = $res['body'] ?? [];
                                         $statusIcon = 'fa-question-circle';
                                 }
                                 
-                                $method = isset($payment['method']) ? $payment['method'] : 'UNKNOWN';
+                                // Method handling
                                 $methodText = '';
                                 switch (strtoupper($method)) {
                                     case 'BANK_TRANSFER':
@@ -194,15 +399,20 @@ $payments = $res['body'] ?? [];
                                         $methodText = $method;
                                 }
                                 
-                                $createdAt = isset($payment['createdAt']) ? date('d/m/Y H:i', strtotime($payment['createdAt'])) : 'N/A';
-                                $amount = isset($payment['amount']) ? floatval($payment['amount']) : 0;
-                                $paymentId = isset($payment['id']) ? $payment['id'] : '';
-                                $orderId = isset($payment['orderId']) ? $payment['orderId'] : '';
-                                $customerId = isset($payment['customerId']) ? $payment['customerId'] : '';
+                                // Format created date
+                                if ($createdAt) {
+                                    if (is_string($createdAt)) {
+                                        $createdAtFormatted = date('d/m/Y H:i', strtotime($createdAt));
+                                    } else {
+                                        $createdAtFormatted = 'N/A';
+                                    }
+                                } else {
+                                    $createdAtFormatted = 'N/A';
+                                }
                             ?>
                             <tr class="hover:bg-gray-50 transition">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    #<?= substr($paymentId, 0, 8) ?>
+                                    #<?= htmlspecialchars(substr($paymentId, 0, 8)) ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     <?= htmlspecialchars($orderId) ?>
@@ -223,20 +433,22 @@ $payments = $res['body'] ?? [];
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <?= $createdAt ?>
+                                    <?= $createdAtFormatted ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                    <?php if ($status === 'PENDING'): ?>
+                                    <?php if ($status === 'PENDING' && $isPayment): ?>
                                         <a href="?confirm=<?= urlencode($paymentId) ?>"
                                            onclick="return confirm('Xác nhận thanh toán này đã hoàn tất?');"
                                            class="text-green-600 hover:text-green-900 mr-4">
                                             <i class="fas fa-check mr-1"></i>Xác nhận
                                         </a>
                                     <?php endif; ?>
-                                    <a href="#" onclick="viewPaymentDetails('<?= $paymentId ?>'); return false;"
+                                    <?php if ($isPayment): ?>
+                                    <a href="#" onclick="viewPaymentDetails('<?= htmlspecialchars($paymentId, ENT_QUOTES) ?>'); return false;"
                                        class="text-blue-600 hover:text-blue-900">
                                         <i class="fas fa-eye mr-1"></i>Chi tiết
                                     </a>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -278,7 +490,7 @@ function showToast(message, type = "success") {
 
 async function viewPaymentDetails(paymentId) {
     try {
-        const response = await fetch(`<?= $apiBase ?>/${paymentId}`);
+        const response = await fetch(`<?= $paymentApiBase ?>/${paymentId}`);
         if (!response.ok) throw new Error('Không thể tải thông tin thanh toán');
         
         const payment = await response.json();

@@ -9,8 +9,8 @@ if (!$studio_id || strtolower($studio_role) !== 'studio') {
     exit();
 }
 $message = [];
-// Gọi qua Kong Gateway đến customer-service
-$api_url = "http://localhost:8000/studios"; // API endpoint qua gateway
+// Gọi qua Kong Gateway đến auth-service
+$api_url = "http://localhost:8000/api/Studio"; // API endpoint qua gateway
 $booking_api_url = "http://localhost:8000/api/StudioBooking"; // API endpoint cho booking
 $token = $_SESSION['token'] ?? '';
 ?>

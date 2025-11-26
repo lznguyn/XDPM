@@ -9,12 +9,12 @@ namespace MuTraProAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class ExpertsController : ControllerBase
+    public class StudioController : ControllerBase
     {
         private readonly MuTraProDbContext _context;
         private readonly IWebHostEnvironment _env;
 
-        public ExpertsController(MuTraProDbContext context, IWebHostEnvironment env)
+        public StudioController(MuTraProDbContext context, IWebHostEnvironment env)
         {
             _context = context;
             _env = env;
@@ -24,26 +24,90 @@ namespace MuTraProAPI.Controllers
         [HttpGet]
         public async Task<IActionResult> GetStuido()
         {
-            // Logic check và update studio status đã được xử lý trong StudioBookingController
-            // Frontend sẽ gọi /api/StudioBooking/check-dates trước khi load danh sách studio
-            
-            var experts = await _context.Studios.ToListAsync();
-            return Ok(new { status = "success", message = "Lấy danh sách studio thành công", data = experts });
+            try
+            {
+                // Logic check và update studio status đã được xử lý trong StudioBookingController
+                // Frontend sẽ gọi /api/StudioBooking/check-dates trước khi load danh sách studio
+                
+                Console.WriteLine("[GetStuido] Starting to fetch studios from database...");
+                
+                // Query studios từ database - enum conversion đã được xử lý trong DbContext
+                var studios = await _context.Studios.ToListAsync();
+                
+                Console.WriteLine($"[GetStuido] Found {studios.Count} studios from database");
+                
+                // Convert để đảm bảo enum được serialize đúng thành string
+                var studiosData = studios.Select(s => new
+                {
+                    id = s.Id,
+                    name = s.Name ?? string.Empty,
+                    location = s.Location ?? string.Empty,
+                    price = s.Price,
+                    status = s.Status.ToString(), // Convert enum sang string (enum conversion đã handle từ DB)
+                    image = s.Image ?? string.Empty
+                }).ToList();
+                
+                Console.WriteLine($"[GetStuido] Successfully converted {studiosData.Count} studios");
+                
+                Console.WriteLine($"[GetStuido] Returning {studiosData.Count} studios");
+                
+                // Luôn trả về success, ngay cả khi danh sách rỗng
+                return Ok(new { 
+                    status = "success", 
+                    message = studiosData.Count > 0 ? "Lấy danh sách studio thành công" : "Không có studio nào trong hệ thống",
+                    data = studiosData 
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GetStuido] Unexpected error: {ex.Message}");
+                Console.WriteLine($"[GetStuido] StackTrace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    Console.WriteLine($"[GetStuido] InnerException: {ex.InnerException.Message}");
+                    Console.WriteLine($"[GetStuido] InnerException StackTrace: {ex.InnerException.StackTrace}");
+                }
+                // Trả về lỗi nhưng vẫn giữ format hợp lệ
+                return StatusCode(500, new { 
+                    status = "error", 
+                    message = "Lỗi khi lấy danh sách studio: " + (ex.InnerException?.Message ?? ex.Message),
+                    data = new List<object>()
+                });
+            }
         }
          // ===== LẤY CHI TIẾT 1 PHÒNG THU =====
         [HttpGet("{id}")]
         public async Task<IActionResult> GetStudio(int id)
         {
-            var studio = await _context.Studios.FindAsync(id);
-            if (studio == null)
-                return NotFound(new { status = "error", message = "Không tìm thấy phòng thu!" });
-
-            return Ok(new
+            try
             {
-                status = "success",
-                message = "Lấy thông tin phòng thu thành công",
-                data = studio
-            });
+                var studio = await _context.Studios.FindAsync(id);
+                if (studio == null)
+                    return NotFound(new { status = "error", message = "Không tìm thấy phòng thu!" });
+
+                // Convert để đảm bảo enum được serialize đúng thành string
+                var studioData = new
+                {
+                    id = studio.Id,
+                    name = studio.Name,
+                    location = studio.Location,
+                    price = studio.Price,
+                    status = studio.Status.ToString(), // Convert enum sang string
+                    image = studio.Image
+                };
+
+                return Ok(new
+                {
+                    status = "success",
+                    message = "Lấy thông tin phòng thu thành công",
+                    data = studioData
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GetStudio: {ex.Message}");
+                return StatusCode(500, new { status = "error", message = "Lỗi khi lấy thông tin phòng thu: " + ex.Message });
+            }
         }
 
         // ===== THÊM CHUYÊN GIA =====

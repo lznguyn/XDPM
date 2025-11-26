@@ -17,16 +17,7 @@ export class PaymentController {
     return this.paymentService.createPayment(dto);
   }
 
-  @Post(':id/confirm')
-  confirm(@Param('id') id: string, @Body() dto: ConfirmPaymentDto) {
-    return this.paymentService.confirmPayment(id, dto);
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.paymentService.getPayment(id);
-  }
-
+  // Specific routes must come before parameterized routes
   @Get('by-order/:orderId')
   getByOrder(@Param('orderId') orderId: string) {
     return this.paymentService.getPaymentByOrder(orderId);
@@ -35,5 +26,15 @@ export class PaymentController {
   @Get('customer/:customerId')
   getByCustomer(@Param('customerId') customerId: string) {
     return this.paymentService.getPaymentsByCustomer(customerId);
+  }
+
+  @Post(':id/confirm')
+  confirm(@Param('id') id: string, @Body() dto: ConfirmPaymentDto) {
+    return this.paymentService.confirmPayment(id, dto);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.paymentService.getPayment(id);
   }
 }

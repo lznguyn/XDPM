@@ -68,6 +68,11 @@ namespace MuTraProAPI.Data
             modelBuilder.Entity<StudioBooking>()
                 .Property(b => b.Status)
                 .HasConversion<string>();
+            
+            // Studio Enum Conversion - Bật lại sau khi database đã được update sang VARCHAR
+            modelBuilder.Entity<Studio>()
+                .Property(s => s.Status)
+                .HasConversion<string>();
         }
     }
 }

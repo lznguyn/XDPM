@@ -3,38 +3,42 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('payments')
+@Entity({ name: 'payments', schema: 'payment' })
 export class Payment {
-  @PrimaryGeneratedColumn('uuid')
-  id: string;
+  @PrimaryGeneratedColumn()
+  id: number;
 
-  @Column()
-  orderId: string;
+  // orderId từ DTO sẽ được map vào work_order_id
+  // Trong database: work_order_id là INT, nhưng orderId từ DTO là string (service_request_id)
+  @Column({ name: 'work_order_id' })
+  workOrderId: number;
 
-  @Column()
-  customerId: string;
+  @Column({ name: 'customer_id' })
+  customerId: number;
 
-  @Column('decimal', { precision: 15, scale: 2 })
+  @Column({ name: 'customer_email' })
+  customerEmail: string;
+
+  @Column('decimal', { precision: 12, scale: 2 })
   amount: number;
 
-  @Column({ default: 'VND' })
-  currency: string;
-
-  @Column()
+  @Column({ name: 'payment_method' })
   method: string; // CREDIT_CARD / MOMO / BANK_TRANSFER / CASH
 
-  @Column({ default: 'PENDING' })
-  status: string; // PENDING / PAID / FAILED / CANCELED / REFUNDED
+  @Column({ name: 'payment_status', default: 'pending' })
+  status: string; // pending / paid / failed / canceled / refunded
 
-  @CreateDateColumn()
+  @Column({ name: 'transaction_id', nullable: true })
+  transactionId: string;
+
+  @CreateDateColumn({ name: 'created_date' })
   createdAt: Date;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
-
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ name: 'completed_date', type: 'timestamp', nullable: true })
   paidAt: Date | null;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
 }

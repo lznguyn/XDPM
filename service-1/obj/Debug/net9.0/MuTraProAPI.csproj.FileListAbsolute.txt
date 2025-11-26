@@ -132,3 +132,6 @@ C:\Users\LENOVO\Desktop\test2\XDPM\service-1\obj\Debug\net9.0\refint\MuTraProAPI
 C:\Users\LENOVO\Desktop\test2\XDPM\service-1\obj\Debug\net9.0\MuTraProAPI.pdb
 C:\Users\LENOVO\Desktop\test2\XDPM\service-1\obj\Debug\net9.0\MuTraProAPI.genruntimeconfig.cache
 C:\Users\LENOVO\Desktop\test2\XDPM\service-1\obj\Debug\net9.0\ref\MuTraProAPI.dll
+C:\Users\LENOVO\Desktop\test2\XDPM\service-1\bin\Debug\net9.0\MQTTnet.dll
+C:\Users\LENOVO\Desktop\test2\XDPM\service-1\bin\Debug\net9.0\Pipelines.Sockets.Unofficial.dll
+C:\Users\LENOVO\Desktop\test2\XDPM\service-1\bin\Debug\net9.0\StackExchange.Redis.dll

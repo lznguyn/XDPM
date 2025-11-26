@@ -95,6 +95,10 @@ setInterval(loadServicePrices, 5 * 60 * 1000);
 let notifications = [];
 let notificationPollInterval = null;
 
+// MQTT CLIENT FOR REAL-TIME NOTIFICATIONS
+let mqttClient = null;
+let mqttReconnectInterval = null;
+
 async function loadNotifications() {
     if (!currentCustomerId) {
         console.warn('Cannot load notifications: currentCustomerId is not set');
@@ -248,17 +252,192 @@ async function markAllAsRead() {
     }
 }
 
+function connectMQTT() {
+    if (!currentCustomerId) {
+        console.warn('Cannot connect MQTT: customerId not set');
+        return;
+    }
+
+    // Kiểm tra nếu đã kết nối
+    if (mqttClient && mqttClient.connected) {
+        console.log('MQTT already connected');
+        return;
+    }
+
+    try {
+        // Sử dụng MQTT over WebSocket
+        // Port 9001 là WebSocket port của Mosquitto
+        // Tự động detect hostname (localhost khi chạy local, hoặc hostname khi chạy trong Docker network)
+        const hostname = window.location.hostname;
+        const mqttBroker = hostname === 'localhost' || hostname === '127.0.0.1' 
+            ? 'ws://localhost:9001' 
+            : `ws://${hostname}:9001`;
+        const clientId = `customer-${currentCustomerId}-${Date.now()}`;
+        
+        console.log(`Connecting to MQTT broker: ${mqttBroker} with clientId: ${clientId}`);
+        
+        // Sử dụng thư viện MQTT.js
+        mqttClient = mqtt.connect(mqttBroker, {
+            clientId: clientId,
+            reconnectPeriod: 5000,
+            connectTimeout: 10000,
+            clean: true
+        });
+
+        mqttClient.on('connect', () => {
+            console.log('✅ Connected to MQTT broker');
+            
+            // Subscribe to customer-specific notifications
+            const customerTopic = `notifications/customer/${currentCustomerId}`;
+            mqttClient.subscribe(customerTopic, { qos: 1 }, (err) => {
+                if (err) {
+                    console.error('Failed to subscribe to customer topic:', err);
+                } else {
+                    console.log(`✅ Subscribed to ${customerTopic}`);
+                }
+            });
+
+            // Subscribe to all notifications (optional - for testing)
+            mqttClient.subscribe('notifications/all', { qos: 1 }, (err) => {
+                if (err) {
+                    console.error('Failed to subscribe to all notifications:', err);
+                } else {
+                    console.log('✅ Subscribed to notifications/all');
+                }
+            });
+        });
+
+        mqttClient.on('message', (topic, message) => {
+            try {
+                const notification = JSON.parse(message.toString());
+                console.log('📨 Received MQTT notification:', notification);
+                
+                // Chỉ xử lý nếu là notification cho customer này
+                if (notification.customerId == currentCustomerId || topic === 'notifications/all') {
+                    // Kiểm tra xem notification đã tồn tại chưa (tránh duplicate)
+                    const existingIndex = notifications.findIndex(n => 
+                        (n.id || n.Id) === notification.serviceRequestId && 
+                        (n.title || n.Title) === notification.title
+                    );
+                    
+                    if (existingIndex === -1) {
+                        // Thêm notification vào đầu danh sách
+                        notifications.unshift({
+                            id: notification.serviceRequestId || Date.now(), // Temporary ID nếu không có
+                            customerId: notification.customerId,
+                            serviceRequestId: notification.serviceRequestId,
+                            title: notification.title,
+                            message: notification.message,
+                            type: notification.type || 'Info',
+                            isRead: false,
+                            createdAt: notification.timestamp || new Date().toISOString()
+                        });
+                    } else {
+                        // Update existing notification
+                        notifications[existingIndex] = {
+                            ...notifications[existingIndex],
+                            title: notification.title,
+                            message: notification.message,
+                            type: notification.type || notifications[existingIndex].type,
+                            isRead: false
+                        };
+                    }
+                    
+                    // Update UI
+                    renderNotifications();
+                    updateNotificationBadge();
+                    
+                    // Show browser notification (nếu được phép)
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification(notification.title, {
+                            body: notification.message,
+                            icon: '/favicon.ico',
+                            badge: '/favicon.ico'
+                        });
+                    }
+                    
+                    // Reload from database để đảm bảo sync
+                    setTimeout(() => {
+                        loadNotifications();
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error('Error parsing MQTT message:', error);
+            }
+        });
+
+        mqttClient.on('error', (error) => {
+            console.error('MQTT error:', error);
+        });
+
+        mqttClient.on('close', () => {
+            console.warn('MQTT connection closed');
+            // Auto-reconnect
+            if (!mqttReconnectInterval) {
+                mqttReconnectInterval = setInterval(() => {
+                    if (!mqttClient || !mqttClient.connected) {
+                        console.log('Reconnecting to MQTT...');
+                        connectMQTT();
+                    } else {
+                        clearInterval(mqttReconnectInterval);
+                        mqttReconnectInterval = null;
+                    }
+                }, 5000);
+            }
+        });
+
+        mqttClient.on('offline', () => {
+            console.warn('MQTT client offline');
+        });
+
+        mqttClient.on('reconnect', () => {
+            console.log('MQTT reconnecting...');
+        });
+
+    } catch (error) {
+        console.error('Failed to connect MQTT:', error);
+    }
+}
+
+function disconnectMQTT() {
+    if (mqttClient) {
+        try {
+            mqttClient.end();
+            console.log('MQTT client disconnected');
+        } catch (error) {
+            console.error('Error disconnecting MQTT:', error);
+        }
+        mqttClient = null;
+    }
+    if (mqttReconnectInterval) {
+        clearInterval(mqttReconnectInterval);
+        mqttReconnectInterval = null;
+    }
+}
+
+// Request browser notification permission
+if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+            console.log('✅ Browser notification permission granted');
+        }
+    });
+}
+
 function startNotificationPolling() {
     if (!currentCustomerId) {
         console.warn('Cannot start notification polling: currentCustomerId is not set');
         return;
     }
     
-    // Load ngay lập tức
+    // Load notifications from database ngay lập tức
     loadNotifications();
     updateNotificationBadge();
     
-    // Polling mỗi 30 giây
+    // Connect to MQTT for real-time notifications
+    connectMQTT();
+    
+    // Also keep polling as backup (less frequent - every 30 seconds)
     if (notificationPollInterval) {
         clearInterval(notificationPollInterval);
     }
@@ -267,7 +446,7 @@ function startNotificationPolling() {
             loadNotifications();
             updateNotificationBadge();
         }
-    }, 30000);
+    }, 30000); // 30 seconds instead of 5 (MQTT is primary)
 }
 
 function stopNotificationPolling() {
@@ -275,6 +454,7 @@ function stopNotificationPolling() {
         clearInterval(notificationPollInterval);
         notificationPollInterval = null;
     }
+    disconnectMQTT();
 }
 
 document.addEventListener('click', (e) => {
@@ -324,6 +504,7 @@ function initializeApp() {
 
 // ==================== LOGIN FLOW ====================
 function logout() {
+    stopNotificationPolling();
     localStorage.removeItem("customerId");
     localStorage.removeItem("customerName");
     localStorage.removeItem("token");
@@ -336,9 +517,10 @@ function updateCustomerDisplay() {
 }
 
 // ==================== TAB SWITCHING ====================
-// Auto-refresh intervals for tracking and payments tabs
+// Auto-refresh intervals for tracking, payments, and studios tabs
 let requestsRefreshInterval = null;
 let paymentsRefreshInterval = null;
+let studiosRefreshInterval = null;
 
 function switchTab(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(tab => {
@@ -395,7 +577,18 @@ function switchTab(tabName, event) {
         }, 10000);
     }
     if (tabName === 'feedback') loadFeedback();
-    if (tabName === 'studios') loadStudios();
+    if (tabName === 'studios') {
+        loadStudios();
+        // Auto-refresh studios every 10 seconds when studios tab is active
+        if (studiosRefreshInterval) {
+            clearInterval(studiosRefreshInterval);
+        }
+        studiosRefreshInterval = setInterval(() => {
+            if (document.getElementById('studios').classList.contains('active')) {
+                loadStudios();
+            }
+        }, 10000);
+    }
 }
 
 // ==================== PROFILE MANAGEMENT ====================
@@ -625,7 +818,10 @@ async function loadRequests() {
                             ${req.title ? `<span>📝 ${req.title}</span>` : ''}
                         </div>
                     </div>
-                    <span class="badge badge-${status.toLowerCase()}">${translateStatus(status)}</span>
+                    <div style="display: flex; flex-direction: column; gap: 5px; align-items: flex-end;">
+                        <span class="badge badge-${status.toLowerCase()}">${translateStatus(status)}</span>
+                        ${paid ? '<span class="badge badge-paid">✅ Đã Thanh Toán</span>' : '<span class="badge badge-unpaid">❌ Chưa Thanh Toán</span>'}
+                    </div>
                 </div>
                 
                 <div class="progress-bar">
@@ -1178,7 +1374,14 @@ async function submitFeedback() {
 let selectedStudio = null;
 
 async function loadStudios() {
+    const messageDiv = document.getElementById('studiosMessage');
+    const container = document.getElementById('studiosList');
+    
     try {
+        // Hiển thị trạng thái đang tải
+        messageDiv.innerHTML = '<div style="color: #667eea; padding: 10px;">🔄 Đang tải danh sách studio...</div>';
+        container.innerHTML = '';
+        
         // Kiểm tra và cập nhật trạng thái studio trước khi load
         try {
             await fetch(`${API_BASE}/api/StudioBooking/check-dates`);
@@ -1187,14 +1390,41 @@ async function loadStudios() {
         }
         
         const response = await fetch(`${API_BASE}/studios`);
-        if (!response.ok) throw new Error('Không thể tải danh sách studio');
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            let errorMessage = 'Không thể tải danh sách studio';
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.message || errorJson.detail || errorMessage;
+            } catch (e) {
+                errorMessage = `HTTP ${response.status}: ${errorText || errorMessage}`;
+            }
+            throw new Error(errorMessage);
+        }
         
         const result = await response.json();
+        
+        // Kiểm tra response format
+        if (!result) {
+            throw new Error('Response không hợp lệ từ server');
+        }
+        
+        // Xử lý cả trường hợp có status error và success
+        if (result.status === 'error') {
+            const errorMsg = result.message || 'Không thể lấy danh sách studio';
+            messageDiv.innerHTML = `<div style="color: #c92a2a; padding: 10px; background: #ffe3e3; border-radius: 8px;">❌ ${errorMsg}</div>`;
+            container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Không có dữ liệu studio</p>';
+            return;
+        }
+        
         const studios = result.data || [];
-        const container = document.getElementById('studiosList');
+        
+        // Xóa thông báo đang tải
+        messageDiv.innerHTML = '';
         
         if (studios.length === 0) {
-            container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Chưa có studio nào</p>';
+            container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Chưa có studio nào trong hệ thống</p>';
             return;
         }
 
@@ -1244,20 +1474,47 @@ async function loadStudios() {
                 </div>
             `;
         }).join('');
+        
+        // Hiển thị thông báo thành công
+        if (studios.length > 0) {
+            messageDiv.innerHTML = `<div style="color: #2f9e44; padding: 10px; background: #e6f7e6; border-radius: 8px;">✓ Đã tải ${studios.length} studio</div>`;
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 3000);
+        }
     } catch (error) {
         console.error('Error loading studios:', error);
-        const messageDiv = document.getElementById('studiosMessage');
-        showMessage(messageDiv, 'Lỗi: ' + error.message, 'error');
+        const errorMessage = error.message || 'Đã xảy ra lỗi không xác định';
+        messageDiv.innerHTML = `<div style="color: #c92a2a; padding: 10px; background: #ffe3e3; border-radius: 8px; margin-bottom: 10px;">❌ Lỗi: ${errorMessage}</div>`;
+        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">Không thể tải danh sách studio. Vui lòng thử lại sau.</p>';
     }
 }
 
 async function openBookingModal(studioId) {
     try {
         const response = await fetch(`${API_BASE}/studios/${studioId}`);
-        if (!response.ok) throw new Error('Không thể tải thông tin studio');
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            let errorMessage = 'Không thể tải thông tin studio';
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.message || errorJson.detail || errorMessage;
+            } catch (e) {
+                errorMessage = `HTTP ${response.status}: ${errorText || errorMessage}`;
+            }
+            throw new Error(errorMessage);
+        }
         
         const result = await response.json();
-        const studio = result.data;
+        
+        // Xử lý cả trường hợp có status error và success
+        if (result.status === 'error') {
+            alert(result.message || 'Không thể tải thông tin studio');
+            return;
+        }
+        
+        const studio = result.data || result;
         
         if (!studio) {
             alert('Không tìm thấy studio');

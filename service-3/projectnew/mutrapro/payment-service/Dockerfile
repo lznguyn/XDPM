@@ -7,8 +7,8 @@ WORKDIR /usr/src/app
 # 3. Copy file package*
 COPY package*.json ./
 
-# 4. Cài dependency
-RUN npm install 
+# 4. Cài dependency với --legacy-peer-deps để xử lý conflict với NestJS 11
+RUN npm install --legacy-peer-deps 
 # 5. Copy source code
 COPY . .
 

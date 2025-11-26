@@ -186,20 +186,77 @@ class DatabaseClient:
     # Studio operations
     async def get_all_studios(self) -> Dict[str, Any]:
         """Get all studios"""
-        # Studio API is in service-1 (auth-service), endpoint is /api/Experts
-        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        # Studio API is in service-1 (auth-service), endpoint is /api/Studio
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Studio"
+        print(f"[get_all_studios] Calling studio API: {studio_api_base}")
         try:
             response = await self.client.get(studio_api_base)
-            response.raise_for_status()
-            return response.json()
+            print(f"[get_all_studios] Response status: {response.status_code}")
+            print(f"[get_all_studios] Response headers: {dict(response.headers)}")
+            
+            if response.status_code == 200:
+                try:
+                    result = response.json()
+                    print(f"[get_all_studios] Response data type: {type(result)}, data: {result}")
+                except Exception as json_error:
+                    print(f"[get_all_studios] Error parsing JSON: {json_error}")
+                    response_text = response.text[:500]  # Lấy 500 ký tự đầu
+                    print(f"[get_all_studios] Response text: {response_text}")
+                    return {"status": "error", "message": f"Lỗi parse JSON response: {str(json_error)}", "data": []}
+                
+                # Kiểm tra response format
+                if isinstance(result, dict):
+                    # Nếu có data field, trả về nguyên bản
+                    if "data" in result:
+                        # Đảm bảo data là list
+                        if not isinstance(result["data"], list):
+                            print(f"[get_all_studios] Data field is not a list, converting...")
+                            result["data"] = [result["data"]] if result["data"] else []
+                        return result
+                    # Nếu không có data field nhưng có status, thêm data rỗng
+                    elif "status" in result:
+                        if result.get("status") == "success" and "data" not in result:
+                            result["data"] = []
+                        elif "data" not in result:
+                            result["data"] = []
+                        return result
+                    else:
+                        # Nếu response là object khác, wrap vào data
+                        return {"status": "success", "message": "Lấy danh sách studio thành công", "data": [result] if result else []}
+                elif isinstance(result, list):
+                    # Nếu response là array, wrap vào format chuẩn
+                    return {"status": "success", "message": "Lấy danh sách studio thành công", "data": result}
+                else:
+                    print(f"[get_all_studios] Unexpected result type: {type(result)}")
+                    return {"status": "success", "message": "Lấy danh sách studio thành công", "data": []}
+            else:
+                error_text = response.text
+                print(f"[get_all_studios] Error response: {error_text}")
+                return {"status": "error", "message": f"Lỗi từ server: HTTP {response.status_code}", "data": []}
+                
         except httpx.HTTPStatusError as e:
+            error_text = e.response.text if e.response else "No response text"
+            print(f"[get_all_studios] HTTPStatusError: {e.response.status_code} - {error_text}")
             if e.response.status_code == 404:
                 return {"status": "error", "message": "Không tìm thấy studio!", "data": []}
-            raise
+            # Trả về lỗi với data rỗng thay vì raise exception
+            return {"status": "error", "message": f"Lỗi khi lấy danh sách studio: {e.response.status_code}", "data": []}
+        except httpx.RequestError as e:
+            print(f"[get_all_studios] RequestError: {str(e)}")
+            import traceback
+            print(f"[get_all_studios] RequestError Traceback: {traceback.format_exc()}")
+            return {"status": "error", "message": f"Không thể kết nối đến service: {str(e)}", "data": []}
+        except Exception as e:
+            print(f"[get_all_studios] Unexpected error: {str(e)}")
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"[get_all_studios] Traceback: {error_trace}")
+            # Đảm bảo luôn trả về dict hợp lệ
+            return {"status": "error", "message": f"Lỗi không xác định: {str(e)}", "data": []}
     
     async def get_studio(self, studio_id: int) -> Dict[str, Any]:
         """Get studio by ID"""
-        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Studio"
         try:
             response = await self.client.get(f"{studio_api_base}/{studio_id}")
             response.raise_for_status()
@@ -212,7 +269,7 @@ class DatabaseClient:
     async def create_studio(self, name: str, location: str, price: float, 
                            status: int = 0, image: Optional[str] = None) -> Dict[str, Any]:
         """Create a new studio"""
-        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Studio"
         data = {
             "name": name,
             "location": location,
@@ -228,7 +285,7 @@ class DatabaseClient:
                            location: Optional[str] = None, price: Optional[float] = None,
                            status: Optional[int] = None, image: Optional[str] = None) -> Dict[str, Any]:
         """Update studio"""
-        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Studio"
         data = {}
         if name:
             data["name"] = name
@@ -252,7 +309,7 @@ class DatabaseClient:
     
     async def delete_studio(self, studio_id: int) -> Dict[str, Any]:
         """Delete studio"""
-        studio_api_base = f"{AUTH_SERVICE_URL}/api/Experts"
+        studio_api_base = f"{AUTH_SERVICE_URL}/api/Studio"
         try:
             response = await self.client.delete(f"{studio_api_base}/{studio_id}")
             response.raise_for_status()

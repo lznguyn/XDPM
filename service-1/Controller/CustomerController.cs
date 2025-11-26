@@ -4,6 +4,8 @@ using MuTraProAPI.Models;
 using MuTraProAPI.Data;
 using BCrypt.Net;
 using MuTraProAPI.Helpers;
+using System.Net.Http.Json;
+using System.Net.Http;
 
 namespace MuTraProAPI.Controllers
 {
@@ -12,10 +14,51 @@ namespace MuTraProAPI.Controllers
     public class CustomerController : ControllerBase
     {
         private readonly MuTraProDbContext _context;
+        private readonly IConfiguration _configuration;
+        private readonly IHttpClientFactory _httpClientFactory;
 
-        public CustomerController(MuTraProDbContext context)
+        public CustomerController(MuTraProDbContext context, IConfiguration configuration, IHttpClientFactory httpClientFactory)
         {
             _context = context;
+            _configuration = configuration;
+            _httpClientFactory = httpClientFactory;
+        }
+
+        // Helper method to invalidate customer cache
+        private async Task InvalidateCustomerCache(int customerId)
+        {
+            await RedisHelper.DeleteAsync($"customer:{customerId}");
+            await RedisHelper.DeletePatternAsync($"customer:*");
+        }
+
+        // Helper method to invalidate request cache
+        private async Task InvalidateRequestCache(int? requestId = null, int? customerId = null)
+        {
+            if (requestId.HasValue)
+            {
+                await RedisHelper.DeleteAsync($"request:{requestId.Value}");
+            }
+            if (customerId.HasValue)
+            {
+                await RedisHelper.DeletePatternAsync($"request:customer:{customerId.Value}*");
+            }
+            await RedisHelper.DeletePatternAsync($"requests:*");
+            // Invalidate admin cache khi có request mới để admin thấy ngay
+            await RedisHelper.DeletePatternAsync("admin:service-requests*");
+        }
+
+        // Helper method to invalidate payment cache
+        private async Task InvalidatePaymentCache(int? customerId = null, int? requestId = null)
+        {
+            if (customerId.HasValue)
+            {
+                await RedisHelper.DeletePatternAsync($"payment:customer:{customerId.Value}*");
+            }
+            if (requestId.HasValue)
+            {
+                await RedisHelper.DeleteAsync($"payment:request:{requestId.Value}");
+            }
+            await RedisHelper.DeletePatternAsync($"payments:*");
         }
 
         // POST: api/Customer
@@ -113,13 +156,21 @@ namespace MuTraProAPI.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetCustomerById(int id)
         {
+            // Try to get from cache first
+            var cacheKey = $"customer:{id}";
+            var cached = await RedisHelper.GetAsync<object>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var customer = await _context.Customers
                 .FirstOrDefaultAsync(c => c.Id == id);
 
             if (customer == null)
                 return NotFound(new { message = "Customer not found" });
 
-            return Ok(new
+            var result = new
             {
                 id = customer.Id,
                 name = customer.Name,
@@ -128,7 +179,12 @@ namespace MuTraProAPI.Controllers
                 address = customer.Address,
                 account_created = customer.AccountCreated,
                 is_active = customer.IsActive
-            });
+            };
+
+            // Store in cache with 1 hour TTL
+            await RedisHelper.SetAsync(cacheKey, result, TimeSpan.FromHours(1));
+
+            return Ok(result);
         }
 
         // PUT: api/Customer/{id}
@@ -147,6 +203,9 @@ namespace MuTraProAPI.Controllers
                 customer.Address = dto.Address;
 
             await _context.SaveChangesAsync();
+
+            // Invalidate cache
+            await InvalidateCustomerCache(id);
 
             return Ok(new
             {
@@ -195,6 +254,9 @@ namespace MuTraProAPI.Controllers
 
             _context.ServiceRequests.Add(request);
             await _context.SaveChangesAsync();
+
+            // Invalidate cache
+            await InvalidateRequestCache(requestId: request.Id, customerId: request.CustomerId);
 
             // Kiểm tra nếu đây là yêu cầu đặt studio (Recording service với [STUDIO_BOOKING] tag)
             if (request.ServiceType == ServiceType.Recording && 
@@ -284,8 +346,8 @@ namespace MuTraProAPI.Controllers
 
                                     _context.StudioBookings.Add(studioBooking);
                                     
-                                    // Cập nhật ServiceRequest status thành Requested
-                                    request.Status = RequestStatus.Requested;
+                                    // Giữ nguyên status là Pending (không cần đổi thành Requested)
+                                    // Status sẽ được admin chuyển sang PendingReview khi duyệt
                                     
                                     await _context.SaveChangesAsync();
                                 }
@@ -325,6 +387,14 @@ namespace MuTraProAPI.Controllers
         [HttpGet("requests/customer/{customerId}")]
         public async Task<IActionResult> GetCustomerRequests(int customerId)
         {
+            // Try to get from cache first
+            var cacheKey = $"request:customer:{customerId}";
+            var cached = await RedisHelper.GetAsync<List<object>>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var requests = await _context.ServiceRequests
                 .Where(r => r.CustomerId == customerId)
                 .Select(r => new
@@ -347,6 +417,9 @@ namespace MuTraProAPI.Controllers
             if (!requests.Any())
                 return NotFound(new { message = "No requests found" });
 
+            // Store in cache with 30 minutes TTL
+            await RedisHelper.SetAsync(cacheKey, requests, TimeSpan.FromMinutes(30));
+
             return Ok(requests);
         }
 
@@ -354,13 +427,21 @@ namespace MuTraProAPI.Controllers
         [HttpGet("requests/{id}")]
         public async Task<IActionResult> GetServiceRequestById(int id)
         {
+            // Try to get from cache first
+            var cacheKey = $"request:{id}";
+            var cached = await RedisHelper.GetAsync<object>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var request = await _context.ServiceRequests
                 .FirstOrDefaultAsync(r => r.Id == id);
 
             if (request == null)
                 return NotFound(new { message = "Request not found" });
 
-            return Ok(new
+            var result = new
             {
                 id = request.Id,
                 customer_id = request.CustomerId,
@@ -374,7 +455,12 @@ namespace MuTraProAPI.Controllers
                 assigned_specialist_id = request.AssignedSpecialistId,
                 priority = request.Priority,
                 paid = request.Paid
-            });
+            };
+
+            // Store in cache with 30 minutes TTL
+            await RedisHelper.SetAsync(cacheKey, result, TimeSpan.FromMinutes(30));
+
+            return Ok(result);
         }
 
         // PUT: api/Customer/requests/{id}/status
@@ -389,6 +475,10 @@ namespace MuTraProAPI.Controllers
             {
                 request.Status = status;
                 await _context.SaveChangesAsync();
+
+                // Invalidate cache
+                await InvalidateRequestCache(requestId: id, customerId: request.CustomerId);
+
                 return Ok(new
                 {
                     id = request.Id,
@@ -485,6 +575,9 @@ namespace MuTraProAPI.Controllers
             schedule.UpdatedAt = DateTimeHelper.Now;
             await _context.SaveChangesAsync();
 
+            // Invalidate cache
+            await InvalidateRequestCache(requestId: request.Id, customerId: request.CustomerId);
+
             return Ok(new
             {
                 message = "Đã chọn chuyên gia và ngày gặp. Đang chờ chuyên gia xác nhận.",
@@ -533,70 +626,105 @@ namespace MuTraProAPI.Controllers
         [HttpPost("payments")]
         public async Task<IActionResult> CreatePayment([FromBody] CreatePaymentDto dto)
         {
-            var customer = await _context.Customers.FindAsync(dto.CustomerId);
-            if (customer == null)
-                return NotFound(new { message = "Customer not found" });
-
-            var payment = new CustomerPayment
+            try
             {
-                CustomerId = dto.CustomerId,
-                ServiceRequestId = dto.ServiceRequestId,
-                Amount = dto.Amount,
-                PaymentMethod = dto.PaymentMethod,
-                PaymentStatus = CustomerPaymentStatus.Completed,
-                PaymentDate = DateTimeHelper.Now,
-                TransactionId = Guid.NewGuid().ToString()
-            };
+                var customer = await _context.Customers.FindAsync(dto.CustomerId);
+                if (customer == null)
+                    return NotFound(new { message = "Customer not found" });
 
-            // Mark request as paid FIRST (before adding payment)
-            var request = await _context.ServiceRequests.FindAsync(dto.ServiceRequestId);
-            if (request == null)
-                return NotFound(new { message = "Service request not found" });
+                var request = await _context.ServiceRequests.FindAsync(dto.ServiceRequestId);
+                if (request == null)
+                    return NotFound(new { message = "Service request not found" });
 
-            request.Paid = true; // Đảm bảo cập nhật paid status
+                // Tạo payment trong service-3 (payment-service) thay vì service-1
+                var paymentServiceUrl = _configuration["PaymentService:BaseUrl"] ?? "http://kong:8000/api/payments";
+                var httpClient = _httpClientFactory.CreateClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(10);
 
-            _context.CustomerPayments.Add(payment);
+                // Map payment method từ service-1 format sang service-3 format
+                var paymentMethod = dto.PaymentMethod.ToUpper();
+                if (paymentMethod == "BANK_TRANSFER" || paymentMethod == "CHUYEN_KHOAN")
+                    paymentMethod = "BANK_TRANSFER";
+                else if (paymentMethod == "CREDIT_CARD" || paymentMethod == "THE_TIN_DUNG")
+                    paymentMethod = "CREDIT_CARD";
+                else if (paymentMethod == "MOMO" || paymentMethod == "VI_DIEN_TU")
+                    paymentMethod = "MOMO";
+                else if (paymentMethod == "CASH" || paymentMethod == "TIEN_MAT")
+                    paymentMethod = "CASH";
 
-            // Save payment and paid status together
-            await _context.SaveChangesAsync();
-            
-            // Reload payment to ensure we have the database-generated ID
-            await _context.Entry(payment).ReloadAsync();
+                var paymentData = new
+                {
+                    orderId = dto.ServiceRequestId.ToString(),
+                    customerId = dto.CustomerId.ToString(),
+                    amount = dto.Amount,
+                    currency = "VND",
+                    method = paymentMethod
+                };
 
-            // Record transaction AFTER payment is saved and reloaded (so we have payment.Id)
-            var transaction = new CustomerTransaction
-            {
-                CustomerId = dto.CustomerId,
-                Description = $"Payment for service request {dto.ServiceRequestId}",
-                Amount = dto.Amount,
-                TransactionType = TransactionType.Payment,
-                Date = DateTimeHelper.Now,
-                PaymentId = payment.Id
-            };
+                var paymentResponse = await httpClient.PostAsJsonAsync(paymentServiceUrl, paymentData);
+                
+                if (!paymentResponse.IsSuccessStatusCode)
+                {
+                    var errorContent = await paymentResponse.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Error creating payment in service-3: {paymentResponse.StatusCode} - {errorContent}");
+                    return StatusCode((int)paymentResponse.StatusCode, new { 
+                        message = "Lỗi khi tạo payment trong payment-service", 
+                        error = errorContent 
+                    });
+                }
 
-            _context.CustomerTransactions.Add(transaction);
-            await _context.SaveChangesAsync();
-            
-            // Verify paid status was saved
-            await _context.Entry(request).ReloadAsync();
-            if (!request.Paid)
-            {
-                // If somehow paid wasn't saved, update it again
-                request.Paid = true;
-                await _context.SaveChangesAsync();
+                var paymentResult = await paymentResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+                var paymentId = paymentResult.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+
+                // Xác nhận payment ngay (trong môi trường thực tế, cần xác nhận từ ngân hàng)
+                if (!string.IsNullOrEmpty(paymentId))
+                {
+                    try
+                    {
+                        var confirmResponse = await httpClient.PostAsJsonAsync(
+                            $"{paymentServiceUrl}/{paymentId}/confirm",
+                            new { result = "SUCCESS" }
+                        );
+                        
+                        if (confirmResponse.IsSuccessStatusCode)
+                        {
+                            // Cập nhật paid status trong service-1
+                            request.Paid = true;
+                            await _context.SaveChangesAsync();
+                            
+                            // Invalidate cache
+                            await InvalidateRequestCache(requestId: dto.ServiceRequestId, customerId: dto.CustomerId);
+                        }
+                    }
+                    catch (Exception confirmEx)
+                    {
+                        Console.WriteLine($"Warning: Failed to confirm payment: {confirmEx.Message}");
+                        // Vẫn trả về success vì payment đã được tạo
+                    }
+                }
+
+                // Trả về kết quả từ service-3
+                return Ok(new
+                {
+                    id = paymentId,
+                    customerId = dto.CustomerId,
+                    serviceRequestId = dto.ServiceRequestId,
+                    amount = dto.Amount,
+                    paymentMethod = paymentMethod,
+                    status = "PENDING",
+                    message = "Payment created successfully in payment-service"
+                });
             }
-
-            return Ok(new
+            catch (Exception ex)
             {
-                id = payment.Id,
-                customer_id = payment.CustomerId,
-                service_request_id = payment.ServiceRequestId,
-                amount = payment.Amount,
-                payment_method = payment.PaymentMethod,
-                payment_status = payment.PaymentStatus.ToString(),
-                payment_date = payment.PaymentDate,
-                transaction_id = payment.TransactionId
-            });
+                Console.WriteLine($"Error in CreatePayment: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                return StatusCode(500, new
+                {
+                    message = "Lỗi khi tạo payment",
+                    error = ex.Message
+                });
+            }
         }
 
         // GET: api/Customer/transactions/{customerId}
@@ -690,6 +818,9 @@ namespace MuTraProAPI.Controllers
 
             request.Paid = dto.Paid;
             await _context.SaveChangesAsync();
+
+            // Invalidate cache để customer dashboard thấy thay đổi ngay lập tức
+            await InvalidateRequestCache(requestId: id, customerId: request.CustomerId);
 
             return Ok(new
             {

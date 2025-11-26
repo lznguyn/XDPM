@@ -17,16 +17,19 @@ if (!$specialist_id || !in_array($specialist_role, $expertRoles)) {
 }
 
 // API base URL - Gọi qua Kong Gateway
-$apiBase = "http://localhost:8000/api";
-$specialistApiBase = "$apiBase/Specialist";
+require_once __DIR__ . '/../config.php';
+$apiBase = getKongBaseUrl() . '/api';
+$specialistApiBase = getApiBaseUrl('Specialist');
 
 // Hàm gọi API
 function callApi($url, $method = 'GET', $data = null, $token = '') {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     
-    $headers = ['Content-Type: application/json'];
+    $headers = ['Content-Type: application/json', 'Accept: application/json'];
     if ($token) {
         $headers[] = 'Authorization: Bearer ' . $token;
     }
@@ -38,11 +41,27 @@ function callApi($url, $method = 'GET', $data = null, $token = '') {
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
+
+    // Log errors for debugging
+    if ($curlError) {
+        error_log("CURL Error in arrangement_page.php: $curlError for URL: $url");
+    }
+    if ($httpCode >= 400) {
+        error_log("API Error in arrangement_page.php: HTTP $httpCode for URL: $url, Response: $response");
+    }
+
+    $body = json_decode($response, true);
+    // Nếu response không phải JSON hoặc là null, trả về response raw
+    if ($body === null && !empty($response)) {
+        $body = $response;
+    }
 
     return [
         'code' => $httpCode,
-        'body' => json_decode($response, true)
+        'body' => $body,
+        'error' => $curlError
     ];
 }
 
@@ -84,9 +103,12 @@ if (isset($_POST['update_schedule'])) {
     if ($res['code'] == 200) {
         $_SESSION['toast_message'] = "✅ Đã cập nhật lịch thành công cho ngày " . date('d/m/Y', strtotime($date)) . "!";
     } else {
-        $errorMsg = $res['body']['message'] ?? $res['body']['title'] ?? 'Unknown error';
+        $errorMsg = is_array($res['body']) ? ($res['body']['message'] ?? $res['body']['title'] ?? 'Unknown error') : ($res['body'] ?? 'Unknown error');
         $_SESSION['toast_message'] = "❌ Lỗi cập nhật lịch (HTTP {$res['code']}): " . $errorMsg;
-        error_log("Schedule update error: " . json_encode($res));
+        if (!empty($res['error'])) {
+            error_log("Schedule update CURL error: " . $res['error']);
+        }
+        error_log("Schedule update error: HTTP {$res['code']}, Response: " . json_encode($res['body']));
     }
     
     header('location:arrangement_page.php');
@@ -102,7 +124,11 @@ if (isset($_POST['accept_meeting'])) {
     if ($res['code'] == 200) {
         $_SESSION['toast_message'] = "✅ Đã chấp nhận meeting thành công!";
     } else {
-        $_SESSION['toast_message'] = "❌ Lỗi: " . ($res['body']['message'] ?? 'Unknown error');
+        $errorMsg = is_array($res['body']) ? ($res['body']['message'] ?? $res['body']['title'] ?? 'Unknown error') : ($res['body'] ?? 'Unknown error');
+        $_SESSION['toast_message'] = "❌ Lỗi (HTTP {$res['code']}): " . $errorMsg;
+        if (!empty($res['error'])) {
+            error_log("Accept meeting error: " . $res['error']);
+        }
     }
     
     header('location:arrangement_page.php');
@@ -121,7 +147,11 @@ if (isset($_POST['reject_meeting'])) {
     if ($res['code'] == 200) {
         $_SESSION['toast_message'] = "✅ Đã từ chối meeting.";
     } else {
-        $_SESSION['toast_message'] = "❌ Lỗi: " . ($res['body']['message'] ?? 'Unknown error');
+        $errorMsg = is_array($res['body']) ? ($res['body']['message'] ?? $res['body']['title'] ?? 'Unknown error') : ($res['body'] ?? 'Unknown error');
+        $_SESSION['toast_message'] = "❌ Lỗi (HTTP {$res['code']}): " . $errorMsg;
+        if (!empty($res['error'])) {
+            error_log("Reject meeting error: " . $res['error']);
+        }
     }
     
     header('location:arrangement_page.php');
@@ -142,7 +172,11 @@ if (isset($_POST['respond_request'])) {
     if ($res['code'] == 200) {
         $_SESSION['toast_message'] = "✅ Đã phản hồi yêu cầu thành công!";
     } else {
-        $_SESSION['toast_message'] = "❌ Lỗi phản hồi: " . ($res['body']['message'] ?? 'Unknown error');
+        $errorMsg = is_array($res['body']) ? ($res['body']['message'] ?? $res['body']['title'] ?? 'Unknown error') : ($res['body'] ?? 'Unknown error');
+        $_SESSION['toast_message'] = "❌ Lỗi phản hồi (HTTP {$res['code']}): " . $errorMsg;
+        if (!empty($res['error'])) {
+            error_log("Respond request error: " . $res['error']);
+        }
     }
     
     header('location:arrangement_page.php');
@@ -151,7 +185,14 @@ if (isset($_POST['respond_request'])) {
 
 // Lấy danh sách yêu cầu của chuyên gia
 $requestsRes = callApi("$specialistApiBase/requests?specialistId=$specialist_id", "GET", null, $token);
-$myRequests = $requestsRes['body'] ?? [];
+if ($requestsRes['code'] == 200 && is_array($requestsRes['body'])) {
+    $myRequests = $requestsRes['body'];
+} else {
+    $myRequests = [];
+    if ($requestsRes['code'] != 200) {
+        error_log("Failed to fetch requests: HTTP {$requestsRes['code']}, Response: " . json_encode($requestsRes['body']));
+    }
+}
 
 // Lấy lịch của chuyên gia (tháng hiện tại)
 $today = new DateTime();
@@ -159,7 +200,14 @@ $startDate = $today->format('Y-m-d');
 $endDate = (clone $today)->modify('+1 month')->format('Y-m-d');
 
 $scheduleRes = callApi("$specialistApiBase/schedule?specialistId=$specialist_id&startDate=$startDate&endDate=$endDate", "GET", null, $token);
-$mySchedule = $scheduleRes['body'] ?? [];
+if ($scheduleRes['code'] == 200 && is_array($scheduleRes['body'])) {
+    $mySchedule = $scheduleRes['body'];
+} else {
+    $mySchedule = [];
+    if ($scheduleRes['code'] != 200) {
+        error_log("Failed to fetch schedule: HTTP {$scheduleRes['code']}, Response: " . json_encode($scheduleRes['body']));
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -210,6 +258,21 @@ $mySchedule = $scheduleRes['body'] ?? [];
                     <h2 class="text-2xl font-bold text-gray-900 mb-4">
                         <i class="fas fa-tasks text-purple-600 mr-2"></i>Yêu cầu được gán cho tôi
                     </h2>
+                    
+                    <?php if ($requestsRes['code'] != 200): ?>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                            <p class="text-red-600">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                <strong>Lỗi tải danh sách yêu cầu:</strong> HTTP <?= $requestsRes['code'] ?>
+                                <?php if (!empty($requestsRes['error'])): ?>
+                                <br><small>CURL Error: <?= htmlspecialchars($requestsRes['error']) ?></small>
+                                <?php endif; ?>
+                                <?php if (!empty($requestsRes['body']) && is_array($requestsRes['body'])): ?>
+                                <br><small>Message: <?= htmlspecialchars($requestsRes['body']['message'] ?? 'Unknown error') ?></small>
+                                <?php endif; ?>
+                            </p>
+                        </div>
+                    <?php endif; ?>
                     
                     <?php if (empty($myRequests)): ?>
                         <div class="text-center py-12">

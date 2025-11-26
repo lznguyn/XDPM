@@ -13,7 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $message[] = 'Mật khẩu phải có ít nhất 8 ký tự!';
     } else {
         // Gọi qua Kong Gateway
-        $api_url = "http://localhost:8000/api/Auth/login";
+        require_once __DIR__ . '/config.php';
+        $api_url = getApiBaseUrl('Auth') . '/login';
 
         $data = json_encode([
             "email" => $email,
@@ -31,10 +32,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         $response = curl_exec($ch);
         $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curl_error = curl_error($ch);
         curl_close($ch);
 
-        // Xử lý phản hồi từ API
-        if ($http_code == 200) {
+        // Kiểm tra lỗi curl
+        if ($response === false || !empty($curl_error)) {
+            $message[] = 'Không thể kết nối đến server. Vui lòng thử lại sau.';
+            if (!empty($curl_error)) {
+                error_log("CURL Error in login.php: " . $curl_error);
+            }
+        } elseif ($http_code == 200) {
             $result = json_decode($response, true);
 
             // Lưu token + user info vào session
@@ -90,13 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 case 'arrangement':
                 case 'transcription':
                 case 'recorder':
-                
-            
                     // Các chuyên gia khác redirect đến arrangement_page.php
                     header('Location: arrangement/arrangement_page.php');
-                    break;
-                case 'studio':
-                    header('Location: studio/studio_page.php');
                     break;
                 default:
                     header('Location: login.php');
@@ -104,8 +106,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
             exit();
         } else {
+            // Xử lý lỗi từ API
             $result = json_decode($response, true);
-            $message[] = $result['message'] ?? 'Đăng nhập thất bại! Vui lòng thử lại.';
+            if ($result && isset($result['message'])) {
+                $message[] = $result['message'];
+            } else {
+                $message[] = 'Đăng nhập thất bại! Vui lòng kiểm tra lại thông tin đăng nhập.';
+            }
         }
     }
 }

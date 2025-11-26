@@ -102,6 +102,90 @@ namespace MuTraProAPI.Helpers
             }
 
             await CreateNotificationAsync(context, request.CustomerId, request.Id, title, message, type);
+
+            // Publish MQTT notification
+            try
+            {
+                var mqttMessage = new
+                {
+                    customerId = request.CustomerId,
+                    serviceRequestId = request.Id,
+                    title = title,
+                    message = message,
+                    type = type.ToString(),
+                    oldStatus = oldStatus.ToString(),
+                    newStatus = newStatus.ToString(),
+                    timestamp = DateTimeHelper.Now
+                };
+
+                await MqttHelper.PublishAsync($"notifications/customer/{request.CustomerId}", mqttMessage, qos: 1);
+                await MqttHelper.PublishAsync("notifications/all", mqttMessage, qos: 1);
+            }
+            catch (Exception ex)
+            {
+                // Log error but don't fail the notification creation
+                Console.WriteLine($"Error publishing MQTT notification: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Publish payment notification via MQTT
+        /// </summary>
+        public static async Task NotifyPaymentAsync(
+            int customerId,
+            int serviceRequestId,
+            decimal amount,
+            string paymentMethod,
+            string transactionId)
+        {
+            try
+            {
+                var mqttMessage = new
+                {
+                    customerId = customerId,
+                    serviceRequestId = serviceRequestId,
+                    amount = amount,
+                    paymentMethod = paymentMethod,
+                    transactionId = transactionId,
+                    timestamp = DateTimeHelper.Now,
+                    type = "Payment"
+                };
+
+                await MqttHelper.PublishAsync($"notifications/customer/{customerId}/payment", mqttMessage, qos: 1);
+                await MqttHelper.PublishAsync("notifications/payments", mqttMessage, qos: 1);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error publishing MQTT payment notification: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Publish schedule update notification via MQTT
+        /// </summary>
+        public static async Task NotifyScheduleUpdateAsync(
+            int specialistId,
+            DateTime date,
+            string? timeSlot = null)
+        {
+            try
+            {
+                var mqttMessage = new
+                {
+                    specialistId = specialistId,
+                    date = date.ToString("yyyy-MM-dd"),
+                    timeSlot = timeSlot,
+                    timestamp = DateTimeHelper.Now,
+                    type = "ScheduleUpdate"
+                };
+
+                await MqttHelper.PublishAsync($"notifications/specialist/{specialistId}/schedule", mqttMessage, qos: 1);
+                await MqttHelper.PublishAsync("notifications/schedules", mqttMessage, qos: 1);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error publishing MQTT schedule notification: {ex.Message}");
+            }
         }
     }
 }

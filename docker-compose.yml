@@ -55,9 +55,19 @@ services:
       ASPNETCORE_URLS: http://+:8081
       # CHUỖI KẾT NỐI ĐÚNG TRONG DOCKER
       ConnectionStrings__DefaultConnection: Server=mysql;Port=3306;Database=MuTraProDB;User=root;Password=root123;
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # MQTT Configuration
+      MQTT_BROKER: mqtt-broker
+      MQTT_PORT: 1883
     depends_on:
       mysql:
         condition: service_healthy  # ĐỢI MySQL SẴN SÀNG
+      redis:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_healthy
 
   # -------------------------
   # Customer Service (FastAPI)
@@ -79,11 +89,21 @@ services:
       DB_NAME: MuTraProDB
       # Auth Service URL for API calls
       AUTH_SERVICE_URL: http://auth-service:8081
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # MQTT Configuration
+      MQTT_BROKER: mqtt-broker
+      MQTT_PORT: 1883
     depends_on:
       mysql:
         condition: service_healthy
       auth-service:
         condition: service_started
+      redis:
+        condition: service_healthy
+      mqtt-broker:
+        condition: service_healthy
 
   # -------------------------
   # Backend Service (Music Transcriber - FastAPI)
@@ -125,6 +145,44 @@ services:
       retries: 3
 
   # -------------------------
+  # Redis Cache
+  # -------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # -------------------------
+  # MQTT Broker (Mosquitto)
+  # -------------------------
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt-broker
+    ports:
+      - "1883:1883"  # MQTT port
+      - "9001:9001"  # WebSocket port
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    command: mosquitto -c /mosquitto/config/mosquitto.conf
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-i", "healthcheck-client", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "2"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # -------------------------
   # Coordinator Service (NestJS)
   # -------------------------
   coordinator-service:
@@ -143,8 +201,18 @@ services:
       NODE_ENV: development
       AUTH_SERVICE_URL: http://auth-service:8081
       PAYMENT_SERVICE_URL: http://payment-service:3001
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # MQTT Configuration
+      MQTT_BROKER: mqtt-broker
+      MQTT_PORT: 1883
     depends_on:
       postgres-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mqtt-broker:
         condition: service_healthy
 
   # -------------------------
@@ -167,8 +235,18 @@ services:
       COORDINATOR_SERVICE_URL: http://coordinator-service:3000
       CUSTOMER_SERVICE_URL: http://customer-service:8001
       KONG_GATEWAY_URL: http://kong:8000
+      # Redis Configuration
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # MQTT Configuration
+      MQTT_BROKER: mqtt-broker
+      MQTT_PORT: 1883
     depends_on:
       postgres-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mqtt-broker:
         condition: service_healthy
       # Không thêm depends_on kong để tránh dependency cycle
       # Kong sẽ được start trước vì nó không phụ thuộc vào payment-service
@@ -188,6 +266,8 @@ services:
       - kong
     environment:
       - APACHE_DOCUMENT_ROOT=/var/www/html
+      - KONG_HOST=kong
+      - KONG_PORT=8000
 
   # -------------------------
   # HTML Frontend Server (Customer Dashboard)
@@ -213,3 +293,4 @@ volumes:
   backend-uploads:
   backend-outputs:
   postgres-data:
+  redis-data:

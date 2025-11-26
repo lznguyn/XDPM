@@ -12,17 +12,19 @@ if (!$admin_id) {
 }
 
 // API base URL - Gọi qua Kong Gateway
-$apiBase = "http://localhost:8000/api/Admin";
+require_once __DIR__ . '/../config.php';
+$apiBase = getApiBaseUrl('Admin');
 $token = $_SESSION['token'] ?? '';
 
-// ✅ Hàm gọi API với JWT token
-function callApi($url, $method = 'GET', $data = null, $token = '')
-{
+// Hàm gọi API
+function callApi($url, $method = 'GET', $data = null, $token = '') {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     
-    $headers = ['Content-Type: application/json'];
+    $headers = ['Content-Type: application/json', 'Accept: application/json'];
     if ($token) {
         $headers[] = 'Authorization: Bearer ' . $token;
     }
@@ -34,12 +36,34 @@ function callApi($url, $method = 'GET', $data = null, $token = '')
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
 
-    return [
+    $result = [
         'code' => $httpCode,
-        'body' => json_decode($response, true)
+        'body' => null,
+        'error' => $curlError
     ];
+
+    if ($curlError) {
+        error_log("CURL Error in admin_expert.php: $curlError for URL: $url");
+    }
+
+    if ($response !== false) {
+        $decoded = json_decode($response, true);
+        $result['body'] = ($decoded !== null) ? $decoded : $response;
+    }
+
+    if ($httpCode >= 400) {
+        error_log("API Error in admin_expert.php: HTTP $httpCode for URL: $url, Response: " . ($response ?: 'No response'));
+    }
+
+    return $result;
+}
+
+// Hàm escape HTML để bảo mật
+function safeHtml($text) {
+    return htmlspecialchars($text ?? '', ENT_QUOTES, 'UTF-8');
 }
 
 // ✅ Xử lý phân công expert
@@ -66,7 +90,6 @@ $res = callApi("$apiBase/users", "GET", null, $token);
 $allUsers = $res['body'] ?? [];
 $apiError = null;
 
-// Debug: Log error nếu có
 if ($res['code'] != 200) {
     $apiError = "API Error: HTTP " . $res['code'];
     if (isset($res['body']['message'])) {
@@ -74,11 +97,10 @@ if ($res['code'] != 200) {
     } elseif (isset($res['body'])) {
         $apiError .= " - " . json_encode($res['body']);
     }
-    error_log($apiError);
     
     // Nếu lỗi, thử gọi lại qua gateway
     if ($res['code'] == 404 || $res['code'] == 500) {
-        $directRes = callApi("http://localhost:8000/api/Admin/users", "GET", null, $token);
+        $directRes = callApi($apiBase . "/users", "GET", null, $token);
         if ($directRes['code'] == 200) {
             $allUsers = $directRes['body'] ?? [];
             $apiError = null; // Clear error if direct call succeeded
@@ -294,7 +316,7 @@ $filteredExperts = $expertsByRole[$currentTab] ?? $experts;
             
             <?php if ($requestsError): ?>
                 <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-                    <p class="text-red-600 text-sm"><?= htmlspecialchars($requestsError) ?></p>
+                    <p class="text-red-600 text-sm"><?= safeHtml($requestsError) ?></p>
                 </div>
             <?php elseif (empty($allRequests)): ?>
                 <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
@@ -341,23 +363,23 @@ $filteredExperts = $expertsByRole[$currentTab] ?? $experts;
                         <div class="flex justify-between items-start mb-3">
                             <div class="flex-1">
                                 <h3 class="font-semibold text-gray-900 mb-1">
-                                    <?= htmlspecialchars($req['title'] ?? 'N/A') ?>
+                                    <?= safeHtml($req['title'] ?? 'N/A') ?>
                                 </h3>
                                 <div class="text-sm text-gray-600 space-y-1">
-                                    <p><i class="fas fa-user mr-2"></i><strong>Khách hàng:</strong> <?= htmlspecialchars($req['customerName'] ?? 'N/A') ?></p>
+                                    <p><i class="fas fa-user mr-2"></i><strong>Khách hàng:</strong> <?= safeHtml($req['customerName'] ?? 'N/A') ?></p>
                                     <p><i class="fas fa-tag mr-2"></i><strong>Loại dịch vụ:</strong> 
                                         <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">
-                                            <?= htmlspecialchars($serviceType) ?>
+                                            <?= safeHtml($serviceType) ?>
                                         </span>
                                     </p>
                                     <p><i class="fas fa-calendar mr-2"></i><strong>Ngày tạo:</strong> <?= !empty($req['createdDate']) ? date('d/m/Y H:i', strtotime($req['createdDate'])) : 'N/A' ?></p>
                                     <?php if (!empty($req['description'])): ?>
-                                    <p class="text-gray-500 mt-2"><i class="fas fa-file-alt mr-2"></i><?= htmlspecialchars(substr($req['description'], 0, 150)) ?><?= strlen($req['description']) > 150 ? '...' : '' ?></p>
+                                    <p class="text-gray-500 mt-2"><i class="fas fa-file-alt mr-2"></i><?= safeHtml(substr($req['description'] ?? '', 0, 150)) ?><?= strlen($req['description'] ?? '') > 150 ? '...' : '' ?></p>
                                     <?php endif; ?>
                                 </div>
                             </div>
                             <span class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
-                                <?= htmlspecialchars($req['status'] ?? 'Submitted') ?>
+                                <?= safeHtml($req['status'] ?? 'Submitted') ?>
                             </span>
                         </div>
                         
@@ -372,7 +394,7 @@ $filteredExperts = $expertsByRole[$currentTab] ?? $experts;
                                 $preferredExpert = array_filter($experts, fn($e) => $e['id'] == $preferredId);
                                 if (!empty($preferredExpert)) {
                                     $pref = reset($preferredExpert);
-                                    echo htmlspecialchars($pref['name'] . ' (' . $pref['role'] . ')');
+                                    echo safeHtml($pref['name'] ?? 'N/A') . ' (' . safeHtml($pref['role'] ?? 'N/A') . ')';
                                 } else {
                                     echo 'ID: ' . $preferredId;
                                 }
@@ -395,13 +417,13 @@ $filteredExperts = $expertsByRole[$currentTab] ?? $experts;
                                         <?php if (empty($suitableExperts)): ?>
                                             <?php foreach ($experts as $expert): ?>
                                             <option value="<?= $expert['id'] ?>" <?= !empty($req['preferredSpecialistId']) && $req['preferredSpecialistId'] == $expert['id'] ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($expert['name']) ?> (<?= htmlspecialchars($expert['role']) ?>)
+                                                <?= safeHtml($expert['name'] ?? 'N/A') ?> (<?= safeHtml($expert['role'] ?? 'N/A') ?>)
                                             </option>
                                             <?php endforeach; ?>
                                         <?php else: ?>
                                             <?php foreach ($suitableExperts as $expert): ?>
                                             <option value="<?= $expert['id'] ?>" <?= !empty($req['preferredSpecialistId']) && $req['preferredSpecialistId'] == $expert['id'] ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($expert['name']) ?> (<?= htmlspecialchars($expert['role']) ?>)
+                                                <?= safeHtml($expert['name'] ?? 'N/A') ?> (<?= safeHtml($expert['role'] ?? 'N/A') ?>)
                                             </option>
                                             <?php endforeach; ?>
                                         <?php endif; ?>
@@ -462,7 +484,7 @@ $filteredExperts = $expertsByRole[$currentTab] ?? $experts;
                     <i class="fas fa-exclamation-triangle text-red-600 text-2xl mr-4"></i>
                     <div>
                         <h3 class="text-red-800 font-semibold mb-1">Lỗi khi lấy dữ liệu experts</h3>
-                        <p class="text-red-600 text-sm"><?= htmlspecialchars($apiError) ?></p>
+                        <p class="text-red-600 text-sm"><?= safeHtml($apiError) ?></p>
                         <p class="text-red-500 text-xs mt-2">Vui lòng kiểm tra lại kết nối API hoặc liên hệ quản trị viên.</p>
                     </div>
                 </div>
@@ -480,7 +502,7 @@ $filteredExperts = $expertsByRole[$currentTab] ?? $experts;
                             Chưa có expert nào trong hệ thống.
                         <?php endif; ?>
                     <?php else: ?>
-                        Không có expert nào với role "<?= htmlspecialchars($currentTab) ?>".
+                        Không có expert nào với role "<?= safeHtml($currentTab) ?>".
                     <?php endif; ?>
                 </p>
             </div>
@@ -520,7 +542,7 @@ $filteredExperts = $expertsByRole[$currentTab] ?? $experts;
                             ?>
                             <tr class="hover:bg-gray-50 transition">
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                    #<?= htmlspecialchars($expert['id']) ?>
+                                    #<?= safeHtml($expert['id'] ?? 'N/A') ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
@@ -531,19 +553,19 @@ $filteredExperts = $expertsByRole[$currentTab] ?? $experts;
                                         </div>
                                         <div class="ml-4">
                                             <div class="text-sm font-medium text-gray-900">
-                                                <?= htmlspecialchars($expert['name']) ?>
+                                                <?= safeHtml($expert['name'] ?? 'N/A') ?>
                                             </div>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     <i class="fas fa-envelope mr-2 text-gray-400"></i>
-                                    <?= htmlspecialchars($expert['email']) ?>
+                                    <?= safeHtml($expert['email'] ?? 'N/A') ?>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-3 py-1 inline-flex items-center text-xs leading-5 font-semibold rounded-full <?= $roleColor ?>">
                                         <i class="fas <?= $roleIcon ?> mr-1"></i>
-                                        <?= htmlspecialchars($role) ?>
+                                        <?= safeHtml($role) ?>
                                     </span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -600,7 +622,8 @@ async function loadSpecialistSchedule(requestId, specialistId) {
         nextMonth.setMonth(nextMonth.getMonth() + 1);
         const endDate = nextMonth.toISOString().split('T')[0];
         
-        const response = await fetch(`http://localhost:8000/api/Admin/specialists/${specialistId}/schedule?startDate=${today}&endDate=${endDate}`, {
+        const apiBase = '<?php echo $apiBase; ?>';
+        const response = await fetch(`${apiBase}/specialists/${specialistId}/schedule?startDate=${today}&endDate=${endDate}`, {
             headers: {
                 'Authorization': 'Bearer <?= $token ?>'
             }

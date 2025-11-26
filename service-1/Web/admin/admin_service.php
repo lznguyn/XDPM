@@ -12,17 +12,19 @@ if (!$admin_id) {
 }
 
 // API base URL - Gọi qua Kong Gateway
-$apiBase = "http://localhost:8000/api/Admin";
+require_once __DIR__ . '/../config.php';
+$apiBase = getApiBaseUrl('Admin');
 $token = $_SESSION['token'] ?? '';
 
-// ✅ Hàm gọi API với JWT token
-function callApi($url, $method = 'GET', $data = null, $token = '')
-{
+// Hàm gọi API
+function callApi($url, $method = 'GET', $data = null, $token = '') {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     
-    $headers = ['Content-Type: application/json'];
+    $headers = ['Content-Type: application/json', 'Accept: application/json'];
     if ($token) {
         $headers[] = 'Authorization: Bearer ' . $token;
     }
@@ -34,12 +36,29 @@ function callApi($url, $method = 'GET', $data = null, $token = '')
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
 
-    return [
+    $result = [
         'code' => $httpCode,
-        'body' => json_decode($response, true)
+        'body' => null,
+        'error' => $curlError
     ];
+
+    if ($curlError) {
+        error_log("CURL Error in admin_service.php: $curlError for URL: $url");
+    }
+
+    if ($response !== false) {
+        $decoded = json_decode($response, true);
+        $result['body'] = ($decoded !== null) ? $decoded : $response;
+    }
+
+    if ($httpCode >= 400) {
+        error_log("API Error in admin_service.php: HTTP $httpCode for URL: $url, Response: " . ($response ?: 'No response'));
+    }
+
+    return $result;
 }
 
 // ✅ Xử lý cập nhật giá dịch vụ
@@ -81,11 +100,21 @@ $res = callApi("$apiBase/service-requests", "GET", null, $token);
 $allRequests = $res['body'] ?? [];
 
 // Phân loại requests theo loại dịch vụ
+// API trả về ServiceType (PascalCase), cần check cả camelCase và PascalCase
 $requestsByServiceType = [
     'all' => $allRequests,
-    'Transcription' => array_filter($allRequests, fn($r) => ($r['serviceType'] ?? '') === 'Transcription'),
-    'Arrangement' => array_filter($allRequests, fn($r) => ($r['serviceType'] ?? '') === 'Arrangement'),
-    'Recording' => array_filter($allRequests, fn($r) => ($r['serviceType'] ?? '') === 'Recording')
+    'Transcription' => array_filter($allRequests, function($r) {
+        $type = $r['ServiceType'] ?? $r['serviceType'] ?? '';
+        return $type === 'Transcription';
+    }),
+    'Arrangement' => array_filter($allRequests, function($r) {
+        $type = $r['ServiceType'] ?? $r['serviceType'] ?? '';
+        return $type === 'Arrangement';
+    }),
+    'Recording' => array_filter($allRequests, function($r) {
+        $type = $r['ServiceType'] ?? $r['serviceType'] ?? '';
+        return $type === 'Recording';
+    })
 ];
 
 // Lấy tab hiện tại từ URL
@@ -331,9 +360,15 @@ $stats = [
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
                             <?php foreach ($filteredRequests as $req): 
-                                $serviceType = $req['serviceType'] ?? 'N/A';
-                                $status = $req['status'] ?? 'Pending';
-                                $customerId = $req['customer_id'] ?? '';
+                                // Map từ PascalCase (API) sang các biến PHP
+                                // API trả về: Id, CustomerId, ServiceType, Status, CreatedDate, Title, Description
+                                $reqId = isset($req['Id']) ? $req['Id'] : (isset($req['id']) ? $req['id'] : null);
+                                $serviceType = $req['ServiceType'] ?? ($req['serviceType'] ?? 'N/A');
+                                $status = $req['Status'] ?? ($req['status'] ?? 'Pending');
+                                $customerId = isset($req['CustomerId']) ? $req['CustomerId'] : (isset($req['customerId']) ? $req['customerId'] : (isset($req['customer_id']) ? $req['customer_id'] : ''));
+                                $title = $req['Title'] ?? ($req['title'] ?? 'Không có tiêu đề');
+                                $description = $req['Description'] ?? ($req['description'] ?? '');
+                                $createdDate = $req['CreatedDate'] ?? ($req['createdDate'] ?? ($req['created_date'] ?? null));
                                 
                                 // Badge màu theo loại dịch vụ
                                 $typeColors = [
@@ -358,15 +393,17 @@ $stats = [
                             ?>
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        #<?= htmlspecialchars($req['id'] ?? 'N/A') ?>
+                                        #<?= $reqId ? htmlspecialchars($reqId, ENT_QUOTES, 'UTF-8') : 'N/A' ?>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="text-sm font-medium text-gray-900">
-                                            <?= htmlspecialchars($req['title'] ?? 'Không có tiêu đề') ?>
+                                            <?= htmlspecialchars($title) ?>
                                         </div>
+                                        <?php if (!empty($description)): ?>
                                         <div class="text-sm text-gray-500 truncate max-w-xs">
-                                            <?= htmlspecialchars(substr($req['description'] ?? '', 0, 50)) ?>...
+                                            <?= htmlspecialchars(substr($description, 0, 50)) ?>...
                                         </div>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full <?= $typeColor ?>">
@@ -382,13 +419,28 @@ $stats = [
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        <?= isset($req['created_date']) ? date('d/m/Y', strtotime($req['created_date'])) : 'N/A' ?>
+                                        <?php 
+                                        if ($createdDate) {
+                                            try {
+                                                $date = is_string($createdDate) ? strtotime($createdDate) : $createdDate;
+                                                echo date('d/m/Y', $date);
+                                            } catch (Exception $e) {
+                                                echo 'N/A';
+                                            }
+                                        } else {
+                                            echo 'N/A';
+                                        }
+                                        ?>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                        <a href="admin_booking.php?id=<?= $req['id'] ?>" 
-                                           class="text-primary hover:text-blue-800 mr-3">
-                                            <i class="fas fa-eye mr-1"></i>Xem
-                                        </a>
+                                        <?php if ($reqId): ?>
+                                            <a href="admin_booking.php?id=<?= htmlspecialchars($reqId, ENT_QUOTES, 'UTF-8') ?>" 
+                                               class="text-primary hover:text-blue-800 mr-3">
+                                                <i class="fas fa-eye mr-1"></i>Xem
+                                            </a>
+                                        <?php else: ?>
+                                            <span class="text-gray-400">N/A</span>
+                                        <?php endif; ?>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

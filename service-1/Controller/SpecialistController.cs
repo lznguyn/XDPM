@@ -20,10 +20,42 @@ namespace MuTraProAPI.Controllers
             _context = context;
         }
 
+        // Helper method to invalidate cache
+        private async Task InvalidateRequestCache(int? requestId = null, int? specialistId = null)
+        {
+            if (requestId.HasValue)
+            {
+                await RedisHelper.DeleteAsync($"request:{requestId.Value}");
+            }
+            if (specialistId.HasValue)
+            {
+                await RedisHelper.DeletePatternAsync($"specialist:{specialistId.Value}:requests*");
+                await RedisHelper.DeletePatternAsync($"specialist:{specialistId.Value}:pending-meetings*");
+            }
+            await RedisHelper.DeletePatternAsync("request:*");
+            // Invalidate admin cache khi có thay đổi từ specialist
+            await RedisHelper.DeletePatternAsync("admin:service-requests*");
+        }
+
+        // Helper method to invalidate schedule cache
+        private async Task InvalidateScheduleCache(int specialistId)
+        {
+            await RedisHelper.DeletePatternAsync($"schedule:specialist:{specialistId}*");
+            await RedisHelper.DeletePatternAsync($"specialist:{specialistId}:schedule*");
+        }
+
         // GET: api/Specialist/requests
         [HttpGet("requests")]
         public async Task<IActionResult> GetMyRequests([FromQuery] int specialistId)
         {
+            // Try to get from cache first
+            var cacheKey = $"specialist:{specialistId}:requests";
+            var cached = await RedisHelper.GetAsync<List<object>>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var requests = await _context.ServiceRequests
                 .Include(r => r.Customer)
                 .Include(r => r.AssignedSpecialist)
@@ -52,6 +84,9 @@ namespace MuTraProAPI.Controllers
                 })
                 .ToListAsync();
 
+            // Store in cache with 10 minutes TTL
+            await RedisHelper.SetAsync(cacheKey, requests, TimeSpan.FromMinutes(10));
+
             return Ok(requests);
         }
 
@@ -59,6 +94,14 @@ namespace MuTraProAPI.Controllers
         [HttpGet("pending-meetings")]
         public async Task<IActionResult> GetPendingMeetings([FromQuery] int specialistId)
         {
+            // Try to get from cache first
+            var cacheKey = $"specialist:{specialistId}:pending-meetings";
+            var cached = await RedisHelper.GetAsync<List<object>>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var requests = await _context.ServiceRequests
                 .Include(r => r.Customer)
                 .Where(r => r.AssignedSpecialistId == specialistId && 
@@ -80,6 +123,9 @@ namespace MuTraProAPI.Controllers
                 })
                 .ToListAsync();
 
+            // Store in cache with 5 minutes TTL (pending meetings change frequently)
+            await RedisHelper.SetAsync(cacheKey, requests, TimeSpan.FromMinutes(5));
+
             return Ok(requests);
         }
 
@@ -100,6 +146,9 @@ namespace MuTraProAPI.Controllers
             var oldStatus = request.Status;
             request.Status = RequestStatus.Completed;
             await _context.SaveChangesAsync();
+
+            // Invalidate cache
+            await InvalidateRequestCache(requestId: id, specialistId: request.AssignedSpecialistId);
 
             // Tạo thông báo cho khách hàng
             await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status);
@@ -161,6 +210,13 @@ namespace MuTraProAPI.Controllers
 
             await _context.SaveChangesAsync();
 
+            // Invalidate cache
+            await InvalidateRequestCache(requestId: id, specialistId: request.AssignedSpecialistId);
+            if (request.AssignedSpecialistId.HasValue)
+            {
+                await InvalidateScheduleCache(request.AssignedSpecialistId.Value);
+            }
+
             // Tạo thông báo cho khách hàng
             await NotificationHelper.NotifyStatusChangeAsync(_context, request, oldStatus, request.Status, dto?.Reason);
 
@@ -196,6 +252,9 @@ namespace MuTraProAPI.Controllers
 
             await _context.SaveChangesAsync();
 
+            // Invalidate cache
+            await InvalidateRequestCache(requestId: id, specialistId: request.AssignedSpecialistId);
+
             // Tạo thông báo cho khách hàng nếu trạng thái thay đổi
             if (oldStatus != request.Status)
             {
@@ -209,6 +268,14 @@ namespace MuTraProAPI.Controllers
         [HttpGet("schedule")]
         public async Task<IActionResult> GetMySchedule([FromQuery] int specialistId, [FromQuery] DateTime? startDate, [FromQuery] DateTime? endDate)
         {
+            // Try to get from cache first
+            var cacheKey = $"specialist:{specialistId}:schedule:{startDate?.ToString("yyyy-MM-dd") ?? "all"}:{endDate?.ToString("yyyy-MM-dd") ?? "all"}";
+            var cached = await RedisHelper.GetAsync<List<object>>(cacheKey);
+            if (cached != null)
+            {
+                return Ok(cached);
+            }
+
             var query = _context.SpecialistSchedules.Where(s => s.SpecialistId == specialistId);
 
             if (startDate.HasValue)
@@ -218,7 +285,7 @@ namespace MuTraProAPI.Controllers
 
             var schedules = await query.OrderBy(s => s.Date).ToListAsync();
 
-            return Ok(schedules.Select(s => new
+            var result = schedules.Select(s => new
                 {
                     s.Id,
                     s.SpecialistId,
@@ -232,7 +299,12 @@ namespace MuTraProAPI.Controllers
                     },
                     createdAt = s.CreatedAt,
                     updatedAt = s.UpdatedAt
-                }));
+                }).ToList();
+
+            // Store in cache with 30 minutes TTL
+            await RedisHelper.SetAsync(cacheKey, result, TimeSpan.FromMinutes(30));
+
+            return Ok(result);
         }
 
         // POST: api/Specialist/schedule
@@ -279,6 +351,15 @@ namespace MuTraProAPI.Controllers
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Invalidate cache
+                await InvalidateScheduleCache(dto.SpecialistId);
+
+                // Publish MQTT schedule update notification
+                await NotificationHelper.NotifyScheduleUpdateAsync(
+                    dto.SpecialistId,
+                    schedule.Date,
+                    null); // All time slots updated
 
                 return Ok(new { 
                     message = "Schedule updated successfully.",

@@ -20,7 +20,8 @@ if(isset($_POST['submit'])){
         $messages[] = 'Mã xác nhận Admin không đúng!';
     } else {
         // Gọi qua Kong Gateway
-        $api_url = "http://localhost:8000/api/Auth/register";
+        require_once __DIR__ . '/config.php';
+        $api_url = getApiBaseUrl('Auth') . '/register';
         $roleMap = [
             'admin' => 0,
             'user' => 1,

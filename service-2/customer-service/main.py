@@ -14,7 +14,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import uvicorn
 import httpx
+import logging
 from db_client import db_client
+from redis_client import redis_cache
+from mqtt_client import mqtt_client
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # Timezone Configuration (UTC+7 - Vietnam Time)
@@ -151,6 +158,22 @@ app.add_middleware(
 )
 
 # ============================================================================
+# Startup and Shutdown Events
+# ============================================================================
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Redis cache and MQTT client on startup"""
+    redis_cache.connect()
+    mqtt_client.connect()
+    logger.info("Customer Service started")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    mqtt_client.disconnect()
+    logger.info("Customer Service stopped")
+
+# ============================================================================
 # CUSTOMER ENDPOINTS
 # ============================================================================
 @app.post("/customers")
@@ -175,9 +198,16 @@ async def create_customer(name: str = Form(...), email: str = Form(...), phone: 
 async def list_customers():
     """Get all customers"""
     try:
+        # Try to get from cache first
+        cache_key = "customers:all"
+        cached = redis_cache.get(cache_key)
+        if cached:
+            logger.debug("Cache hit for all customers")
+            return cached
+
         customers = await db_client.get_all_customers()
         # Convert to expected format
-        return [{
+        result = [{
             "id": str(c["id"]),
             "name": c["name"],
             "email": c["email"],
@@ -186,6 +216,10 @@ async def list_customers():
             "account_created": c["account_created"],
             "is_active": c["is_active"]
         } for c in customers]
+
+        # Store in cache with 15 minutes TTL
+        redis_cache.set(cache_key, result, ttl=900)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -193,11 +227,18 @@ async def list_customers():
 async def get_customer(customer_id: str):
     """Get customer profile by ID"""
     try:
+        # Try to get from cache first
+        cache_key = f"customer:{customer_id}"
+        cached = redis_cache.get(cache_key)
+        if cached:
+            logger.debug(f"Cache hit for customer {customer_id}")
+            return cached
+
         customer = await db_client.get_customer(int(customer_id))
         if not customer:
             raise HTTPException(status_code=404, detail="Customer not found")
         
-        return {
+        result = {
             "id": str(customer["id"]),
             "name": customer["name"],
             "email": customer["email"],
@@ -206,6 +247,10 @@ async def get_customer(customer_id: str):
             "account_created": customer["account_created"],
             "is_active": customer["is_active"]
         }
+
+        # Store in cache with 1 hour TTL
+        redis_cache.set(cache_key, result, ttl=3600)
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -216,7 +261,7 @@ async def update_customer(customer_id: str, name: Optional[str] = Form(None), ph
     """Update customer profile"""
     try:
         customer = await db_client.update_customer(int(customer_id), name, phone, address)
-        return {
+        result = {
             "id": str(customer["id"]),
             "name": customer["name"],
             "email": customer["email"],
@@ -225,6 +270,18 @@ async def update_customer(customer_id: str, name: Optional[str] = Form(None), ph
             "account_created": customer["account_created"],
             "is_active": customer["is_active"]
         }
+
+        # Invalidate cache
+        redis_cache.delete(f"customer:{customer_id}")
+        redis_cache.delete_pattern("customers:*")
+
+        # Publish MQTT notification
+        mqtt_client.publish(f'customer/{customer_id}/updated', {
+            'customerId': customer_id,
+            'timestamp': get_vietnam_time().isoformat(),
+        })
+
+        return result
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -282,7 +339,7 @@ async def create_service_request(
             status=status  # Truyền status từ frontend
         )
         
-        return {
+        result = {
             "id": str(request["id"]),
             "customer_id": str(request["customer_id"]),
             "service_type": request["service_type"],
@@ -296,6 +353,22 @@ async def create_service_request(
             "priority": request.get("priority", "normal"),
             "paid": request.get("paid", False)
         }
+
+        # Invalidate cache
+        redis_cache.delete_pattern(f"request:customer:{customer_id}*")
+        redis_cache.delete(f"request:{result['id']}")
+
+        # Publish MQTT notification
+        mqtt_client.publish('customer/request/created', {
+            'requestId': result['id'],
+            'customerId': result['customer_id'],
+            'serviceType': result['service_type'],
+            'title': result['title'],
+            'status': result['status'],
+            'timestamp': get_vietnam_time().isoformat(),
+        })
+
+        return result
     except HTTPException:
         raise
     except httpx.HTTPStatusError as e:
@@ -317,11 +390,18 @@ async def create_service_request(
 async def get_customer_requests(customer_id: str):
     """Get all service requests for a customer"""
     try:
+        # Try to get from cache first
+        cache_key = f"request:customer:{customer_id}"
+        cached = redis_cache.get(cache_key)
+        if cached:
+            logger.debug(f"Cache hit for customer requests {customer_id}")
+            return cached
+
         requests = await db_client.get_customer_requests(int(customer_id))
         if not requests:
             raise HTTPException(status_code=404, detail="No requests found")
         
-        return [{
+        result = [{
             "id": str(r["id"]),
             "customer_id": str(r["customer_id"]),
             "service_type": r["service_type"],
@@ -335,6 +415,10 @@ async def get_customer_requests(customer_id: str):
             "priority": r.get("priority", "normal"),
             "paid": r.get("paid", False)
         } for r in requests]
+
+        # Store in cache with 30 minutes TTL
+        redis_cache.set(cache_key, result, ttl=1800)
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -344,11 +428,18 @@ async def get_customer_requests(customer_id: str):
 async def get_request_details(request_id: str):
     """Get service request details"""
     try:
+        # Try to get from cache first
+        cache_key = f"request:{request_id}"
+        cached = redis_cache.get(cache_key)
+        if cached:
+            logger.debug(f"Cache hit for request {request_id}")
+            return cached
+
         request = await db_client.get_service_request(int(request_id))
         if not request:
             raise HTTPException(status_code=404, detail="Request not found")
         
-        return {
+        result = {
             "id": str(request["id"]),
             "customer_id": str(request["customer_id"]),
             "service_type": request["service_type"],
@@ -362,6 +453,10 @@ async def get_request_details(request_id: str):
             "priority": request.get("priority", "normal"),
             "paid": request.get("paid", False)
         }
+
+        # Store in cache with 30 minutes TTL
+        redis_cache.set(cache_key, result, ttl=1800)
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -390,10 +485,23 @@ async def update_request_status(request_id: str, status: RequestStatus = Form(..
         db_status = status_map.get(status_str, status_str.capitalize())
         
         request = await db_client.update_request_status(int(request_id), db_status)
-        return {
+        result = {
             "id": str(request["id"]),
             "status": request["status"]
         }
+
+        # Invalidate cache
+        redis_cache.delete(f"request:{request_id}")
+        redis_cache.delete_pattern(f"request:customer:*")
+
+        # Publish MQTT notification
+        mqtt_client.publish(f'customer/request/{request_id}/status', {
+            'requestId': request_id,
+            'status': request["status"],
+            'timestamp': get_vietnam_time().isoformat(),
+        })
+
+        return result
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -435,51 +543,105 @@ async def create_payment(
     amount: float = Form(...),
     payment_method: str = Form(...)
 ):
-    """Process payment"""
+    """Process payment - Tạo payment trong service-3 (payment-service)"""
     import httpx
     import os
     
     try:
-        # Tạo payment record
-        # Lưu ý: CreatePayment endpoint trong CustomerController đã tự động cập nhật paid = true
-        payment = await db_client.create_payment(
-            customer_id=int(customer_id),
-            service_request_id=int(service_request_id),
-            amount=amount,
-            payment_method=payment_method
-        )
+        # Gọi service-3 (payment-service) để tạo payment
+        payment_service_url = os.getenv("PAYMENT_SERVICE_URL", "http://kong:8000/api/payments")
         
-        # Verify that paid status was updated (CreatePayment should have done this)
-        # Nếu cần, có thể gọi update_request_paid_status như một backup
-        try:
-            # Double-check: verify paid status was set
-            request_check = await db_client.get_service_request(int(service_request_id))
-            if request_check and not request_check.get("paid", False):
-                # Nếu chưa được cập nhật, thử cập nhật lại
-                print(f"[PAYMENT] Paid status not updated by CreatePayment, updating manually...")
-                await db_client.update_request_paid_status(int(service_request_id), True)
-                print(f"[PAYMENT] Successfully updated paid status for request {service_request_id}")
-            else:
-                print(f"[PAYMENT] Paid status already set to true for request {service_request_id}")
-        except Exception as e:
-            # Log error nhưng không fail payment
-            print(f"[PAYMENT WARNING] Could not verify/update paid status: {e}")
-            import traceback
-            traceback.print_exc()
-            # Không raise exception ở đây để payment vẫn được tạo
-        
-        return {
-            "id": str(payment["id"]),
-            "customer_id": str(payment["customer_id"]),
-            "service_request_id": str(payment["service_request_id"]),
-            "amount": float(payment["amount"]),
-            "payment_method": payment["payment_method"],
-            "status": payment["payment_status"],
-            "payment_date": payment["payment_date"],
-            "transaction_id": payment.get("transaction_id")
+        # Map payment method từ format service-2 sang format service-3
+        method_map = {
+            "BANK_TRANSFER": "BANK_TRANSFER",
+            "CHUYEN_KHOAN": "BANK_TRANSFER",
+            "CREDIT_CARD": "CREDIT_CARD",
+            "THE_TIN_DUNG": "CREDIT_CARD",
+            "MOMO": "MOMO",
+            "VI_DIEN_TU": "MOMO",
+            "CASH": "CASH",
+            "TIEN_MAT": "CASH"
         }
+        mapped_method = method_map.get(payment_method.upper(), payment_method.upper())
+        
+        payment_data = {
+            "orderId": str(service_request_id),
+            "customerId": str(customer_id),
+            "amount": float(amount),
+            "currency": "VND",
+            "method": mapped_method
+        }
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Tạo payment trong service-3
+            payment_response = await client.post(
+                payment_service_url,
+                json=payment_data
+            )
+            
+            if not payment_response.is_success:
+                error_detail = payment_response.text
+                logger.error(f"Payment service error: {payment_response.status_code} - {error_detail}")
+                raise HTTPException(
+                    status_code=payment_response.status_code,
+                    detail=f"Lỗi khi tạo payment trong payment-service: {error_detail}"
+                )
+            
+            payment_result = payment_response.json()
+            payment_id = payment_result.get("id")
+            
+            # Xác nhận payment ngay (trong môi trường thực tế, cần xác nhận từ ngân hàng)
+            if payment_id:
+                try:
+                    confirm_response = await client.post(
+                        f"{payment_service_url}/{payment_id}/confirm",
+                        json={"result": "SUCCESS"}
+                    )
+                    
+                    if confirm_response.is_success:
+                        # Cập nhật paid status trong service-1
+                        try:
+                            await db_client.update_request_paid_status(int(service_request_id), True)
+                            logger.info(f"Updated paid status for request {service_request_id}")
+                        except Exception as paid_ex:
+                            logger.warning(f"Could not update paid status: {paid_ex}")
+                except Exception as confirm_ex:
+                    logger.warning(f"Could not confirm payment: {confirm_ex}")
+                    # Vẫn trả về success vì payment đã được tạo
+        
+        # Format result để tương thích với frontend
+        result = {
+            "id": payment_id,
+            "customer_id": customer_id,
+            "service_request_id": service_request_id,
+            "amount": float(amount),
+            "payment_method": mapped_method,
+            "status": payment_result.get("status", "PENDING"),
+            "payment_date": payment_result.get("createdAt", get_vietnam_time().isoformat()),
+            "transaction_id": payment_id
+        }
+
+        # Invalidate cache
+        redis_cache.delete_pattern(f"payment:customer:{customer_id}*")
+        redis_cache.delete(f"payment:request:{service_request_id}")
+        redis_cache.delete_pattern(f"transactions:customer:{customer_id}*")
+        redis_cache.delete(f"request:{service_request_id}")
+
+        # Publish MQTT notification
+        mqtt_client.publish('customer/payment/created', {
+            'paymentId': result['id'],
+            'customerId': result['customer_id'],
+            'requestId': result['service_request_id'],
+            'amount': result['amount'],
+            'status': result['status'],
+            'timestamp': get_vietnam_time().isoformat(),
+        })
+
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"[PAYMENT ERROR] {str(e)}")
+        logger.error(f"[PAYMENT ERROR] {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -493,16 +655,28 @@ async def generate_payment_qr(request_id: str, amount: float = 50000):
     
     try:
         # Thông tin tài khoản ngân hàng (có thể cấu hình qua environment variables)
-        bank_account = os.getenv("BANK_ACCOUNT", "1234567890")  # Số tài khoản ngân hàng
-        bank_code = os.getenv("BANK_CODE", "970422")  # Mã ngân hàng (970422 = Techcombank)
-        bank_name = os.getenv("BANK_NAME", "Ngân hàng Techcombank")
+        bank_account = os.getenv("BANK_ACCOUNT", "0961991565")  # Số tài khoản ngân hàng
+        bank_code = os.getenv("BANK_CODE", "970422")  # Mã ngân hàng (970422 = MBBANK - Ngân hàng Quân đội)
+        bank_name = os.getenv("BANK_NAME", "Ngân hàng Quân đội (MBBANK)")
+        account_name = os.getenv("ACCOUNT_NAME", "PHAN THANH AN")  # Tên chủ tài khoản
         
         # Format nội dung chuyển khoản
         content = f"Thanh toan don hang {request_id}"
         
-        # Tạo chuỗi VietQR theo format đơn giản
-        # Format: bank_account|bank_code|amount|content
-        # Có thể mở rộng để dùng format EMV QR Code nếu cần
+        # Tạo chuỗi VietQR theo format EMV QR Code chuẩn
+        # Format VietQR: 00020101021238570010A00000072701270006A000000727029700080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000_string
+        # Thông tin tài khoản ngân hàng (có thể cấu hình qua environment variables)
+        bank_account = os.getenv("BANK_ACCOUNT", "0961991565")  # Số tài khoản ngân hàng
+        bank_code = os.getenv("BANK_CODE", "970422")  # Mã ngân hàng (970422 = MBBANK - Ngân hàng Quân đội)
+        bank_name = os.getenv("BANK_NAME", "Ngân hàng Quân đội (MBBANK)")
+        account_name = os.getenv("ACCOUNT_NAME", "PHAN THANH AN")  # Tên chủ tài khoản
+        
+        # Format nội dung chuyển khoản
+        content = f"Thanh toan don hang {request_id}"
+        
+        # Tạo chuỗi VietQR theo format EMV QR Code chuẩn
+        # Format VietQR đơn giản: bank_account|bank_code|amount|content
+        # Hoặc có thể dùng format EMV QR Code đầy đủ nếu cần
         qr_data = f"{bank_account}|{bank_code}|{int(amount)}|{content}"
         
         # Tạo QR code
@@ -529,6 +703,7 @@ async def generate_payment_qr(request_id: str, amount: float = 50000):
             "bank_account": bank_account,
             "bank_code": bank_code,
             "bank_name": bank_name,
+            "account_name": account_name,
             "amount": amount,
             "content": content,
             "request_id": request_id
@@ -543,11 +718,18 @@ async def generate_payment_qr(request_id: str, amount: float = 50000):
 async def get_customer_transactions(customer_id: str):
     """Get transaction history for customer"""
     try:
+        # Try to get from cache first
+        cache_key = f"transactions:customer:{customer_id}"
+        cached = redis_cache.get(cache_key)
+        if cached:
+            logger.debug(f"Cache hit for customer transactions {customer_id}")
+            return cached
+
         transactions = await db_client.get_customer_transactions(int(customer_id))
         if not transactions:
             raise HTTPException(status_code=404, detail="No transactions found")
         
-        return [{
+        result = [{
             "id": str(t["id"]),
             "customer_id": str(t["customer_id"]),
             "description": t["description"],
@@ -556,6 +738,10 @@ async def get_customer_transactions(customer_id: str):
             "date": t["date"],
             "payment_id": str(t["payment_id"]) if t.get("payment_id") else None
         } for t in transactions]
+
+        # Store in cache with 10 minutes TTL
+        redis_cache.set(cache_key, result, ttl=600)
+        return result
     except HTTPException:
         raise
     except Exception as e:
@@ -568,12 +754,50 @@ async def get_customer_transactions(customer_id: str):
 async def list_studios():
     """Get all studios"""
     try:
+        print(f"[list_studios] Starting to fetch studios...")
         result = await db_client.get_all_studios()
+        print(f"[list_studios] Got result: {result}")
+        
         # API trả về format: { status: "success", message: "...", data: [...] }
-        # Giữ nguyên format từ service-1
+        # hoặc { status: "error", message: "...", data: [] }
+        # Luôn trả về result, ngay cả khi có lỗi (đã được handle trong db_client)
+        
+        # Đảm bảo result là dict
+        if not isinstance(result, dict):
+            print(f"[list_studios] Result is not a dict: {type(result)}")
+            result = {"status": "error", "message": "Response format không hợp lệ", "data": []}
+        
+        # Đảm bảo có field data
+        if "data" not in result:
+            result["data"] = []
+        
+        # Đảm bảo data là list
+        if not isinstance(result.get("data"), list):
+            print(f"[list_studios] Data is not a list: {type(result.get('data'))}")
+            result["data"] = []
+        
+        # Đảm bảo có field status
+        if "status" not in result:
+            result["status"] = "success" if result.get("data") else "error"
+        
+        # Đảm bảo có field message
+        if "message" not in result:
+            result["message"] = "Lấy danh sách studio thành công" if result.get("status") == "success" else "Có lỗi xảy ra"
+        
+        print(f"[list_studios] Returning result with status: {result.get('status')}, data count: {len(result.get('data', []))}")
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        error_msg = f"[list_studios] Error in endpoint: {str(e)}"
+        error_trace = traceback.format_exc()
+        print(error_msg)
+        print(error_trace)
+        # Trả về response hợp lệ thay vì raise exception
+        return {
+            "status": "error", 
+            "message": f"Lỗi server: {str(e)}", 
+            "data": []
+        }
 
 @app.get("/studios/{studio_id}")
 async def get_studio(studio_id: str):

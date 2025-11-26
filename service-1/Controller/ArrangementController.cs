@@ -8,11 +8,11 @@ namespace MuTraProAPI.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class Arrangement : ControllerBase
+    public class ArrangementController : ControllerBase
     {
         private readonly MuTraProDbContext _context;
         private readonly IWebHostEnvironment _env;
-        public Arrangement(MuTraProDbContext context, IWebHostEnvironment env)
+        public ArrangementController(MuTraProDbContext context, IWebHostEnvironment env)
         {
             _context = context;
             _env = env;

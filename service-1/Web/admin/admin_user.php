@@ -12,17 +12,19 @@ if (!$admin_id) {
 }
 
 // API base URL - Gọi qua Kong Gateway
-$apiBase = "http://localhost:8000/api/Admin";
+require_once __DIR__ . '/../config.php';
+$apiBase = getApiBaseUrl('Admin');
 $token = $_SESSION['token'] ?? '';
 
-// ✅ Hàm gọi API với JWT token
-function callApi($url, $method = 'GET', $data = null, $token = '')
-{
+// Hàm gọi API
+function callApi($url, $method = 'GET', $data = null, $token = '') {
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     
-    $headers = ['Content-Type: application/json'];
+    $headers = ['Content-Type: application/json', 'Accept: application/json'];
     if ($token) {
         $headers[] = 'Authorization: Bearer ' . $token;
     }
@@ -34,12 +36,34 @@ function callApi($url, $method = 'GET', $data = null, $token = '')
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
     curl_close($ch);
 
-    return [
+    $result = [
         'code' => $httpCode,
-        'body' => json_decode($response, true)
+        'body' => null,
+        'error' => $curlError
     ];
+
+    if ($curlError) {
+        error_log("CURL Error in admin_user.php: $curlError for URL: $url");
+    }
+
+    if ($response !== false) {
+        $decoded = json_decode($response, true);
+        $result['body'] = ($decoded !== null) ? $decoded : $response;
+    }
+
+    if ($httpCode >= 400) {
+        error_log("API Error in admin_user.php: HTTP $httpCode for URL: $url, Response: " . ($response ?: 'No response'));
+    }
+
+    return $result;
+}
+
+// Hàm escape HTML để bảo mật
+function safeHtml($text) {
+    return htmlspecialchars($text ?? '', ENT_QUOTES, 'UTF-8');
 }
 
 // ✅ Lấy danh sách users từ API
@@ -47,7 +71,6 @@ $res = callApi("$apiBase/users", "GET", null, $token);
 $users = $res['body'] ?? [];
 $apiError = null;
 
-// Debug: Log error nếu có
 if ($res['code'] != 200) {
     $apiError = "API Error: HTTP " . $res['code'];
     if (isset($res['body']['message'])) {
@@ -55,11 +78,10 @@ if ($res['code'] != 200) {
     } elseif (isset($res['body'])) {
         $apiError .= " - " . json_encode($res['body']);
     }
-    error_log($apiError);
     
     // Nếu lỗi, thử gọi lại qua gateway
     if ($res['code'] == 404 || $res['code'] == 500) {
-        $directRes = callApi("http://localhost:8000/api/Admin/users", "GET", null, $token);
+        $directRes = callApi($apiBase . "/users", "GET", null, $token);
         if ($directRes['code'] == 200) {
             $users = $directRes['body'] ?? [];
             $apiError = null; // Clear error if direct call succeeded
@@ -226,17 +248,17 @@ $filteredUsers = $usersByRole[$currentTab] ?? $users;
                         ?>
                         <tr class="hover:bg-gray-50 transition">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                #<?= htmlspecialchars($user['id']) ?>
+                                #<?= safeHtml($user['id'] ?? 'N/A') ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                <?= htmlspecialchars($user['name']) ?>
+                                <?= safeHtml($user['name'] ?? 'N/A') ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <?= htmlspecialchars($user['email']) ?>
+                                <?= safeHtml($user['email'] ?? 'N/A') ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full <?= $roleColor ?>">
-                                    <?= htmlspecialchars($role) ?>
+                                    <?= safeHtml($role) ?>
                                 </span>
                             </td>
                         </tr>

@@ -16,7 +16,7 @@ if (!$edit_id) {
 }
 
 $message = [];
-$api_url = "http://localhost:8000/studios"; // API endpoint qua gateway
+$api_url = "http://localhost:8000/api/Studio"; // API endpoint qua gateway
 
 // Load studio data
 $studio_data = null;
