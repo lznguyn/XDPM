@@ -1,0 +1,58 @@
+services:
+  coordinator-db:
+    image: postgres:16
+    container_name: mutrapro-coordinator-db
+    environment:
+      POSTGRES_DB: mutrapro_coordinator
+      POSTGRES_USER: mutrapro
+      POSTGRES_PASSWORD: mutrapro_pw
+    ports:
+      - "5433:5432"
+    volumes:
+      - coordinator-db-data:/var/lib/postgresql/data
+
+  coordinator-service:
+    build: ./coordinator-service
+    container_name: mutrapro-coordinator-service
+    environment:
+      DB_HOST: coordinator-db
+      DB_PORT: 5432
+      DB_USER: mutrapro
+      DB_PASS: mutrapro_pw
+      DB_NAME: mutrapro_coordinator
+      PORT: 3000
+    depends_on:
+      - coordinator-db
+    ports:
+      - "8081:3000"
+
+  payment-db:
+    image: postgres:16
+    container_name: mutrapro-payment-db
+    environment:
+      POSTGRES_DB: mutrapro_payment
+      POSTGRES_USER: mutrapro
+      POSTGRES_PASSWORD: mutrapro_pw
+    ports:
+      - "5434:5432"
+    volumes:
+      - payment-db-data:/var/lib/postgresql/data
+
+  payment-service:
+    build: ./payment-service
+    container_name: mutrapro-payment-service
+    environment:
+      DB_HOST: payment-db
+      DB_PORT: 5432
+      DB_USER: mutrapro
+      DB_PASS: mutrapro_pw
+      DB_NAME: mutrapro_payment
+      PORT: 3000
+    depends_on:
+      - payment-db
+    ports:
+      - "8082:3000"
+
+volumes:
+  coordinator-db-data:
+  payment-db-data:
