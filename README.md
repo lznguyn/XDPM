@@ -1,3 +1,5 @@
+Link doc: https://phamnguyen0234.atlassian.net/wiki/spaces/XDHuongdoi/pages/edit-v2/721215?draftShareId=b519e9d8-d2d3-45be-ac37-1c750c436a7c
+
 # MuTraPro - Hệ Thống Quản Lý Dịch Vụ Âm Nhạc
 
 MuTraPro là hệ thống quản lý dịch vụ âm nhạc được thiết kế theo kiến trúc **Microservices**, hỗ trợ các dịch vụ phiên âm (transcription), phối khí (arrangement), và thu âm (recording).
