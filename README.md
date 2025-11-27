@@ -1,4 +1,4 @@
-Link doc: https://phamnguyen0234.atlassian.net/wiki/spaces/XDHuongdoi/pages/edit-v2/721215?draftShareId=b519e9d8-d2d3-45be-ac37-1c750c436a7c
+Link doc: [https://phamnguyen0234.atlassian.net/wiki/spaces/XDHuongdoi/pages/edit-v2/721215?draftShareId=b519e9d8-d2d3-45be-ac37-1c750c436a7c](https://phamnguyen0234.atlassian.net/wiki/spaces/XDHuongdoi/pages/721215/Custom+Music+Transcription+and+Production+System)
 
 # MuTraPro - Hệ Thống Quản Lý Dịch Vụ Âm Nhạc
 
